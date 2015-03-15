@@ -1,15 +1,14 @@
-import times
+import times, math
 
-type
-  Timer = tuple[startTime: float, endTime: float]
-
-template doBenchmark*(benchmarkExpression: expr, loops: int, innerLoops: int): seq[Timer] {.immediate.} =
-  var result: seq[Timer] = newSeq[Timer](loops)
+template doBenchmark*(benchmarkExpression: expr, loops: int, innerLoops: int): RunningStat =
+  var result: RunningStat
   for idx in 0..loops-1:
     var st = epochTime()
     for innerIdx in 0..innerLoops-1:
       benchmarkExpression
     var et = epochTime()
-    result[idx] = (startTime: st, endtime: et)
+    var duration = et - st
+    var durationPerInnerLoop = duration/toFloat(innerLoops)
+    result.push(durationPerInnerLoop)
   result
 
