@@ -5,7 +5,7 @@ NIM_SRC_TEST_TARGET=$(TEST_DIR)/test1
 NIM_BIN_TEST_TARGET=$(TEST_DIR)/bin/test1
 
 #NIM_FLAGS=
-NIM_FLAGS= -d:useSysAssert -d:useGcAssert
+NIM_FLAGS= -d:useSysAssert -d:useGcAssert --parallelBuild:1
 
 test: build-test run-test
 

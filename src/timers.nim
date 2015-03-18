@@ -77,7 +77,6 @@ elif defined(posixRealtime):
   proc `-`*(a, b: TTicks): TNanos {.borrow.}
 
 else:
-  echo "timers else"
   # fallback Posix implementation:  
   type
     Ttimeval {.importc: "struct timeval", header: "<sys/select.h>", 
