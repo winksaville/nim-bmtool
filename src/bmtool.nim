@@ -1,22 +1,27 @@
 import math, timers
 
 proc getBegCycles*(): tuple[lo: uint32, hi: uint32] {.inline.} =
-  var begLo, begHi: uint32
+  # Somewhat dangerous because the compiler isn't tracking the name
+  # properly I had to use the field names of the tuple as defined by
+  # the code generator. Might be better to use temporaries as I did
+  # before an construct the tuple upon exiting but this looks cleaner.
+  # One other thing I had to use "return result" since the compiler
+  # doesn't understand that the asm statement initialised the result.
+  # This comment applies to getEndCycles too.
   asm """
     mfence
     rdtsc
-    :"=a"(`begLo`), "=d"(`begHi`)
+    :"=a"(`result.Field0`), "=d"(`result.Field1`)
   """
-  result = (lo: begLo, hi: begHi)
+  return result
 
 proc getEndCycles*(): tuple[lo: uint32, hi: uint32] {.inline.} =
-  var endLo, endHi: uint32
   asm """
     rdtscp
     mfence
-    :"=a"(`endLo`), "=d"(`endHi`)
+    :"=a"(`result.Field0`), "=d"(`result.Field1`)
   """
-  result = (lo: endLo, hi: endHi)
+  return result
 
 proc measureCycles*(procedure: proc()): int64 =
   ## Returns number of cycles to execute the procedure parameter.
