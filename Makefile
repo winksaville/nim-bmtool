@@ -8,6 +8,7 @@ NIM_SRC_TEST2_TARGET=$(TEST_DIR)/test2
 NIM_BIN_TEST2_TARGET=$(TEST_DIR)/bin/test2
 
 NIM_FLAGS=
+#NIM_FLAGS= -d:useSysAssert -d:useGcAssert
 #NIM_FLAGS= -d:useSysAssert -d:useGcAssert --parallelBuild:1
 
 all: test2
