@@ -166,7 +166,7 @@ proc measureCycles*(procedure: proc()): int64 =
   endCycles = int64(endLo) or (int64(endHi) shl 32)
   result = endCycles - begCycles
 
-template doBmCycles*(procedure: proc(), loops: int): RunningStat =
+template doBmCycles*(loops: int, procedure: proc()): RunningStat =
   ## Uses measureCycles to return the RunningStat of executing the procedure parameter.
   ## Since measureCycles has asm statements that don't expand properly in templates we
   ## have to use a proc procedure. This is quite a bit less flexible then being able to
@@ -181,108 +181,112 @@ template doBmCycles*(procedure: proc(), loops: int): RunningStat =
       result.push(float(cycles))
   result
 
-template doBmCycles2*(benchmarkExpression: expr, loops: int): RunningStat =
+template doBmCycles2*(loops: int, body: stmt): RunningStat  =
   ## Uses getBegCyclesTuple/getEndCyclesTuple to get the cycles and returns the RunningStat.
   ##
   ## This does yield the do nothing proc call at 78 to 81 cycles fairly consistently on linux.
+  const DBG = false
   var result: RunningStat
   initialize()
   for idx in 0..loops-1:
     var begTuple = getBegCyclesTuple()
-    benchmarkExpression
+    body
     var endTuple = getEndCyclesTuple()
     var bc = int64(begTuple.lo) or (int64(begTuple.hi) shl 32)
     var ec = int64(endTuple.lo) or (int64(endTuple.hi) shl 32)
     var duration = float(ec - bc)
     if duration < 0:
-      echo "bad duration=" & $duration & " ec=" & $float(ec) & " bc=" & $float(bc)
+      when DBG: echo "bad duration=" & $duration & " ec=" & $float(ec) & " bc=" & $float(bc)
     else:
       result.push(duration)
   result
 
-template doBmCycles3*(benchmarkExpression: expr, loops: int): RunningStat =
+template doBmCycles3*(loops: int, body: stmt): RunningStat =
   ## Uses getBegCycles/getEndCycles to get the cycles and returns the RunningStat.
   ##
   ## Performance: This does yield the do nothing proc call at 81 to 93 cycles on linux.
+  const DBG = false
   var result: RunningStat
   initialize()
   for idx in 0..loops-1:
     var bc = getBegCycles()
-    benchmarkExpression
+    body
     var ec = getEndCycles()
     var duration = float(ec - bc)
     if duration < 0:
-      echo "bad duration=" & $duration & " ec=" & $float(ec) & " bc=" & $float(bc)
+      when DBG: echo "bad duration=" & $duration & " ec=" & $float(ec) & " bc=" & $float(bc)
     else:
       result.push(duration)
   result
 
-template doBmTicks*(benchmarkExpression: expr, loops: int): RunningStat =
-  ## Uses getTicks to return the RunningStat of executing the benchmarkExpression parameter.
+template doBmTicks*(loops: int, body: stmt): RunningStat =
+  ## Uses getTicks to return the RunningStat of executing the body parameter.
   ## On the mac this uses  mac specific and yeilds probably the most consistent results.
   ##
   ## Performance: On linux this isn't working at all give 0 but on mac is probably the best.
   ## probably need to use inner loop technique as with doBmTime.
+  const DBG = false
   var result: RunningStat
   for idx in 0..loops-1:
     var st = getTicks()
-    benchmarkExpression
+    body
     var et = getTicks()
     var duration = float(et - st)
     if duration < 0:
-      echo "bad duration=" & $duration & " et=" & $float(et) & " st=" & $float(st)
+      when DBG: echo "bad duration=" & $duration & " et=" & $float(et) & " st=" & $float(st)
     else:
       result.push(duration)
   result
 
-template doBmTime*(benchmarkExpression: expr, loops: int, innerLoops: int): RunningStat =
+template doBmTime*(loops: int, innerLoops: int, body: stmt): RunningStat =
   ## Use epochTime to measure. Since one inner loop is to short of a time frame
   ## we measure the time for all of the inner loops then divide by number of
   ## innerLoops to get time per loop.
   ##
   ## Performance: With innerLoops long enough time does we see 3.1 to 2.8ns/loop
+  const DBG = false
   var result: RunningStat
   for idx in 0..loops-1:
     var st = epochTime()
     for innerIdx in 0..innerLoops-1:
-      benchmarkExpression
+      body
     var et = epochTime()
     var duration = float(et - st)/float(innerLoops)
     if duration < 0:
-      echo "bad duration=" & $duration & " et=" & $float(et) & " st=" & $float(st)
+      when DBG: echo "bad duration=" & $duration & " et=" & $float(et) & " st=" & $float(st)
     else:
       result.push(duration)
   result
 
 # Execute body loops times and return nanosecs to run
-template timeit*(loops: int, body: stmt): float =
+template timeit*(body: stmt): float =
   var
     result: float
     startTime: float
 
   startTime = epochTime()
-  for idx in 1..loops:
-    body
+  discard body
   result = epochTime() - startTime
   result
 
-template calibrate*(millis: int, body: stmt): int =
+template calibrate*(seconds: float, body: stmt): int =
+  const DBG = false
   var
     result: int
     guess = 1
     time: float
-    maxTime = float(millis) / 1000.0
+    maxTime = seconds
     minTime = maxTime * 0.95
     goalTime = minTime + ((maxTime - minTime) / 2.0)
 
-  #echo "calibrate:+ goalTime=", goalTime, " minTime=", minTime, " maxTime=", maxtime
+  when DBG: echo "calibrate:+ goalTime=", goalTime, " minTime=", minTime, " maxTime=", maxtime
 
   # Find an initial guess
   for loops in 1..20:
-    time = timeit(guess, body)
-    #echo("calibrate:  ", loops, " time=", time, " guess=", guess)
+    time = timeit(doBmCycles2(guess, body))
+    when DBG: echo("calibrate:  ", loops, " time=", time, " guess=", guess)
     if time > (goalTime / 8.0):
-      #echo "calibrate:  Initial time=", time, " guess=", guess
+      when DBG: echo "calibrate:  Initial time=", time, " guess=", guess
       break
     else:
       guess *= 4
@@ -300,16 +304,36 @@ template calibrate*(millis: int, body: stmt): int =
     bestGuess = round(goalTime / timePerLoop)
     if bestGuess <= 0:
       bestGuess = 1
-      #echo("calibrate:  body takes too long, return 1")
+      when DBG: echo("calibrate:  body takes too long, return 1")
       break
-    time = timeit(bestGuess, body)
+    time = timeit(doBmCycles2(bestGuess, body))
 
-  #echo("calibrate:- time=", time, " bestGuess=", bestGuess)
+  when DBG: echo("calibrate:- time=", time, " bestGuess=", bestGuess)
   result = bestGuess
   result
 
+template benchSetupImpl*: stmt {.immediate, dirty.} = discard
 
-#template suite(name: expr, body: stmt) {.immediate.} =
-#  block:
-#    body
-#    echo name
+template benchSuite*(name: string, benchSuiteBody: stmt) {.immediate, dirty.} =
+  block:
+    echo "benchSuite: name=", name
+
+    template setup*(setupBody: stmt): stmt {.immediate, dirty.} =
+      template benchSetupImpl: stmt {.immediate, dirty.} = setupBody
+
+    benchSuiteBody
+
+template bench*(name: expr, benchBody: stmt): stmt {.immediate, dirty.} =
+  benchSetupImpl()
+
+  const DBG = true
+  var
+    bnName = name
+    loops: int
+    rs: RunningStat
+
+  loops = calibrate(1.0, benchBody)
+  when DBG: echo "loops=", loops
+  rs = doBmCycles2(loops, benchBody)
+  when DBG: echo "rs=", rs
+

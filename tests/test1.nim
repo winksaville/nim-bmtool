@@ -23,13 +23,13 @@ proc nada() =
 
 echo ""
 echo "Warm up the cpu"
-var rs = doBmCycles(nada, 10_000_000)
+var rs = doBmCycles(10_000_000, nada)
 echo "warm up=", rs
 
 for loops in loopsArray:
-  empty = doBmCycles(nada, loops)
-  stats = doBmCycles(incg, loops)
-  stats2 = doBmCycles(inc2, loops)
+  empty = doBmCycles(loops, nada)
+  stats = doBmCycles(loops, incg)
+  stats2 = doBmCycles(loops, inc2)
 
   #echo "cycles empty standardDeviation=" & $empty.standardDeviation() & " innerLoops=" & $innerLoops & " empty=" & $empty
   #echo "cycles stats standardDeviation=" & $stats.standardDeviation() & " innerLoops=" & $innerLoops & " stats=" & $stats
@@ -38,9 +38,9 @@ for loops in loopsArray:
 echo ""
 
 for loops in loopsArray:
-  empty = doBmCycles2(nada(), loops)
-  stats = doBmCycles2(incg(), loops)
-  stats2 = doBmCycles2(inc2(), loops)
+  empty = doBmCycles2(loops, nada())
+  stats = doBmCycles2(loops, incg())
+  stats2 = doBmCycles2(loops, inc2())
 
   #echo "cycles2 empty standardDeviation=" & $empty.standardDeviation() & " innerLoops=" & $innerLoops & " empty=" & $empty
   #echo "cycles2 stats standardDeviation=" & $stats.standardDeviation() & " innerLoops=" & $innerLoops & " stats=" & $stats
@@ -49,9 +49,9 @@ for loops in loopsArray:
 echo ""
 
 for loops in loopsArray:
-  empty = doBmCycles3(nada(), loops)
-  stats = doBmCycles3(incg(), loops)
-  stats2 = doBmCycles3(inc2(), loops)
+  empty = doBmCycles3(loops, nada())
+  stats = doBmCycles3(loops, incg())
+  stats2 = doBmCycles3(loops, inc2())
 
   #echo "cycles3 empty standardDeviation=" & $empty.standardDeviation() & " innerLoops=" & $innerLoops & " empty=" & $empty
   #echo "cycles3 stats standardDeviation=" & $stats.standardDeviation() & " innerLoops=" & $innerLoops & " stats=" & $stats
@@ -61,9 +61,9 @@ echo ""
 
 # Ticks doesn't work on linux, but is quite good on mac!
 for loops in loopsArray:
-  empty = doBmTicks(nada(), loops)
-  stats = doBmTicks(incg(), loops)
-  stats2 = doBmTicks(inc2(), loops)
+  empty = doBmTicks(loops, nada())
+  stats = doBmTicks(loops, incg())
+  stats2 = doBmTicks(loops, inc2())
 
   #echo "ticks empty standardDeviation=" & $empty.standardDeviation() & " innerLoops=" & $innerLoops & " empty=" & $empty
   #echo "ticks stats standardDeviation=" & $stats.standardDeviation() & " innerLoops=" & $innerLoops & " stats=" & $stats
@@ -76,9 +76,9 @@ var innerLoops = 1
 for z in 1..6:
   innerLoops *= 10
 
-  empty = doBmTime(nada(), outerLoops, innerLoops)
-  stats = doBmTime(incg(), outerLoops, innerLoops)
-  stats2 = doBmTime(inc2(), outerLoops, innerLoops)
+  empty = doBmTime(outerLoops, innerLoops, nada())
+  stats = doBmTime(outerLoops, innerLoops, incg())
+  stats2 = doBmTime(outerLoops, innerLoops, inc2())
 
   #echo "time empty standardDeviation=" & $empty.standardDeviation() & " innerLoops=" & $innerLoops & " empty=" & $empty
   #echo "time stats standardDeviation=" & $stats.standardDeviation() & " innerLoops=" & $innerLoops & " stats=" & $stats
