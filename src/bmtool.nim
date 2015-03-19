@@ -1,3 +1,7 @@
+# The use of cpuid, rtsc, rtsp is from the document from Intel titled
+#   "How to Benchmark Code Execution Times on Intel IA-32 and IA-64 Instruction Set Architectures"
+# Here is a link to the document:
+#   https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CB4QFjAA&url=http%3A%2F%2Fwww.intel.com%2Fcontent%2Fdam%2Fwww%2Fpublic%2Fus%2Fen%2Fdocuments%2Fwhite-papers%2Fia-32-ia-64-benchmark-code-execution-paper.pdf&ei=GOAKVYnCGdLXoATpjYDACg&usg=AFQjCNEYjOs81ZAayyNeQkswpMNmra86Zg&sig2=EdYam2ml2Ch88rpRXhi4eQ&bvm=bv.88528373,d.cGU
 import math, times, timers, os
 
 proc `$`*(r: RunningStat): string =
@@ -11,39 +15,119 @@ proc getBegCyclesTuple*(): tuple[lo: uint32, hi: uint32] {.inline.} =
   # One other thing I had to use "return result" since the compiler
   # doesn't understand that the asm statement initialised the result.
   # This comment applies to getEndCycles too.
-  asm """
-    mfence
-    rdtsc
-    :"=a"(`result.Field0`), "=d"(`result.Field1`)
-  """
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
+  {.emit: """
+    asm volatile(
+      "rdtsc\n"
+      :"=a"(`result.Field0`), "=d"(`result.Field1`));
+  """.}
   return result
 
 proc getBegCycles*(): int64 {.inline.} =
   var lo, hi: uint32
-  asm """
-    mfence
-    rdtsc
-    :"=a"(`lo`), "=d"(`hi`)
-  """
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
+  {.emit: """
+    asm volatile(
+      "rdtsc\n"
+      :"=a"(`lo`), "=d"(`hi`));
+  """.}
   result = int64(lo) or (int64(hi) shl 32)
 
 proc getEndCyclesTuple*(): tuple[lo: uint32, hi: uint32] {.inline.} =
-  asm """
-    rdtscp
-    mfence
-    :"=a"(`result.Field0`), "=d"(`result.Field1`)
-  """
+  {.emit: """
+    asm volatile(
+      "rdtscp\n"
+      :"=a"(`result.Field0`), "=d"(`result.Field1`));
+  """.}
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
   return result
 
 proc getEndCycles*(): int64 {.inline.} =
   var lo, hi: uint32
-  asm """
-    rdtscp
-    mfence
-    :"=a"(`lo`), "=d"(`hi`)
-  """
+  {.emit: """
+    asm volatile(
+      "rdtscp\n"
+      :"=a"(`lo`), "=d"(`hi`));
+  """.}
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
   result = int64(lo) or (int64(hi) shl 32)
 
+proc initialize*() =
+  ## Initalize as per the ia32-ia64-benchmark document
+  var begLo, begHi: uint32
+  var endLo, endHi: uint32
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
+  {.emit: """
+    asm volatile(
+      "rdtsc\n"
+      :"=a"(`begLo`), "=d"(`begHi`));
+  """.}
+  {.emit: """
+    asm volatile(
+      "rdtscp\n"
+      :"=a"(`endLo`), "=d"(`endHi`));
+  """.}
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
+  {.emit: """
+    asm volatile(
+      "rdtsc\n"
+      :"=a"(`begLo`), "=d"(`begHi`));
+  """.}
+  {.emit: """
+    asm volatile(
+      "rdtscp\n"
+      :"=a"(`endLo`), "=d"(`endHi`));
+  """.}
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
 
 proc measureCycles*(procedure: proc()): int64 =
   ## Returns number of cycles to execute the procedure parameter.
@@ -53,17 +137,31 @@ proc measureCycles*(procedure: proc()): int64 =
   var begLo, begHi: uint32
   var endLo, endHi: uint32
   var begCycles, endCycles: int64
-  asm """
-    mfence
-    rdtsc
-    :"=a"(`begLo`), "=d"(`begHi`)
-  """
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
+  {.emit: """
+    asm volatile(
+      "rdtsc\n"
+      :"=a"(`begLo`), "=d"(`begHi`));
+  """.}
   procedure()
-  asm """
-    rdtscp
-    mfence
-    :"=a"(`endLo`), "=d"(`endHi`)
-  """
+  {.emit: """
+    asm volatile(
+      "rdtsc\n"
+      :"=a"(`endLo`), "=d"(`endHi`));
+  """.}
+  {.emit: """
+    asm volatile(
+      "cpuid\n"
+      : /* No output */
+      : /* No input */
+      : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
   begCycles = int64(begLo) or (int64(begHi) shl 32)
   endCycles = int64(endLo) or (int64(endHi) shl 32)
   result = endCycles - begCycles
@@ -76,11 +174,10 @@ template doBmCycles*(procedure: proc(), loops: int): RunningStat =
   ##
   ## This does yield the do nothing proc call at 42 to 48 cycles on linux.
   var result: RunningStat
+  initialize()
   for idx in 0..loops-1:
     var cycles = measureCycles(procedure)
-    if cycles < 0:
-      echo "bad cycles=", cycles
-    else:
+    if cycles >= 0:
       result.push(float(cycles))
   result
 
@@ -89,6 +186,7 @@ template doBmCycles2*(benchmarkExpression: expr, loops: int): RunningStat =
   ##
   ## This does yield the do nothing proc call at 78 to 81 cycles fairly consistently on linux.
   var result: RunningStat
+  initialize()
   for idx in 0..loops-1:
     var begTuple = getBegCyclesTuple()
     benchmarkExpression
@@ -107,6 +205,7 @@ template doBmCycles3*(benchmarkExpression: expr, loops: int): RunningStat =
   ##
   ## Performance: This does yield the do nothing proc call at 81 to 93 cycles on linux.
   var result: RunningStat
+  initialize()
   for idx in 0..loops-1:
     var bc = getBegCycles()
     benchmarkExpression
