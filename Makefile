@@ -11,12 +11,13 @@ NIM_FLAGS=
 #NIM_FLAGS= -d:useSysAssert -d:useGcAssert --parallelBuild:1
 
 all: test2
+#all: test1 test2
 
 test2: build-test2 run-test2
 
 test1: build-test1 run-test1
 
-build-test1: $(NIM_BIN_TEST1_TARGET)
+build-test1: clean-tests $(NIM_BIN_TEST1_TARGET)
 
 run-test1: $(NIM_BIN_TEST1_TARGET)
 	./$(NIM_BIN_TEST1_TARGET) $(LOOPS)

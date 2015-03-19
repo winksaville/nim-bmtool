@@ -1,4 +1,7 @@
-import math, timers, os
+import math, times, timers, os
+
+proc `$`*(r: RunningStat): string =
+  "{n=" & $r.n & " sum=" & $r.sum & " min=" & $r.min & " max=" & $r.max & " mean=" & $r.mean & "}"
 
 proc getBegCyclesTuple*(): tuple[lo: uint32, hi: uint32] {.inline.} =
   # Somewhat dangerous because the compiler isn't tracking the name
@@ -152,3 +155,62 @@ template doBmTime*(benchmarkExpression: expr, loops: int, innerLoops: int): Runn
       result.push(duration)
   result
 
+# Execute body loops times and return nanosecs to run
+template timeit*(loops: int, body: stmt): float =
+  var
+    result: float
+    startTime: float
+
+  startTime = epochTime()
+  for idx in 1..loops:
+    body
+  result = epochTime() - startTime
+  result
+
+template calibrate*(millis: int, body: stmt): int =
+  var
+    result: int
+    guess = 1
+    time: float
+    maxTime = float(millis) / 1000.0
+    minTime = maxTime * 0.95
+    goalTime = minTime + ((maxTime - minTime) / 2.0)
+
+  #echo "calibrate:+ goalTime=", goalTime, " minTime=", minTime, " maxTime=", maxtime
+
+  # Find an initial guess
+  for loops in 1..20:
+    time = timeit(guess, body)
+    #echo("calibrate:  ", loops, " time=", time, " guess=", guess)
+    if time > (goalTime / 8.0):
+      #echo "calibrate:  Initial time=", time, " guess=", guess
+      break
+    else:
+      guess *= 4
+
+  # Search for something closer calculating timePerLoop
+  # and then a newGuess. If the bestGuess and oldGuess
+  # are equal or if bestGuess <= 0 then this is the best
+  # we can do. This happens when the time per loop is
+  # large and we can't converge.
+  var oldGuess = 0
+  var bestGuess = guess
+  while (oldGuess != bestGuess) and ((time < minTime) or (time > maxTime)):
+    oldGuess = bestGuess
+    var timePerLoop = time / float(oldGuess)
+    bestGuess = round(goalTime / timePerLoop)
+    if bestGuess <= 0:
+      bestGuess = 1
+      #echo("calibrate:  body takes too long, return 1")
+      break
+    time = timeit(bestGuess, body)
+
+  #echo("calibrate:- time=", time, " bestGuess=", bestGuess)
+  result = bestGuess
+  result
+
+
+#template suite(name: expr, body: stmt) {.immediate.} =
+#  block:
+#    body
+#    echo name

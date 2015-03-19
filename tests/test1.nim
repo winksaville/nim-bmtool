@@ -1,4 +1,4 @@
-import bmtool, times, math
+import bmtool, math
 
 echo "test1:+"
 
@@ -20,9 +20,6 @@ proc inc2() =
 
 proc nada() =
   discard
-
-proc `$`*(r: RunningStat): string =
-  "{n=" & $r.n & " sum=" & $r.sum & " min=" & $r.min & " max=" & $r.max & " mean=" & $r.mean & "}"
 
 echo ""
 echo "Warm up the cpu"
