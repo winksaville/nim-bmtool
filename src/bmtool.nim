@@ -312,28 +312,29 @@ template calibrate*(seconds: float, body: stmt): int =
   result = bestGuess
   result
 
-template benchSetupImpl*: stmt {.immediate, dirty.} = discard
+when true:
+  template benchSetupImpl*: stmt {.immediate, dirty.} = discard
 
-template benchSuite*(name: string, benchSuiteBody: stmt) {.immediate, dirty.} =
-  block:
-    echo "benchSuite: name=", name
+  template benchSuite*(name: string, benchSuiteBody: stmt) {.immediate, dirty.} =
+    block:
+      echo "benchSuite: name=", name
 
-    template setup*(setupBody: stmt): stmt {.immediate, dirty.} =
-      template benchSetupImpl: stmt {.immediate, dirty.} = setupBody
+      template setup*(setupBody: stmt): stmt {.immediate, dirty.} =
+        template benchSetupImpl: stmt {.immediate, dirty.} = setupBody
 
-    benchSuiteBody
+      benchSuiteBody
 
-template bench*(name: expr, benchBody: stmt): stmt {.immediate, dirty.} =
-  benchSetupImpl()
+  template bench*(name: expr, benchBody: stmt): stmt {.immediate, dirty.} =
+    benchSetupImpl()
 
-  const DBG = true
-  var
-    bnName = name
-    loops: int
-    rs: RunningStat
+    const DBG = true
+    var
+      bnName = name
+      loops: int
+      rs: RunningStat
 
-  loops = calibrate(1.0, benchBody)
-  when DBG: echo "loops=", loops
-  rs = doBmCycles2(loops, benchBody)
-  when DBG: echo "rs=", rs
+    loops = calibrate(1.0, benchBody)
+    when DBG: echo "loops=", loops
+    rs = doBmCycles2(loops, benchBody)
+    when DBG: echo "rs=", rs
 

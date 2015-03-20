@@ -1,17 +1,17 @@
 import bmtool, math, os
 
-var
-  gInt: int = 3
-
-proc doNothing() =
-  (discard)
-
-proc incg(v: int) =
-  gInt += v
-
-var loops: int
-
 when false:
+  var
+    gInt: int = 3
+
+  proc doNothing() =
+    (discard)
+
+  proc incg(v: int) =
+    gInt += v
+
+  var loops: int
+
   loops = calibrate(1.0, doNothing())
   echo "calibrate doNothing loops=", loops
   echo "time doNothing=", timeit(doBmCycles2(loops, doNothing()))
@@ -57,7 +57,7 @@ when false:
     tlRs = doBmCycles2(tlLoops, nada())
     echo "tlRs=", tlRs
 
-when true:
+when false:
     proc nada() =
       (discard)
 
@@ -96,4 +96,69 @@ when false:
     echo "val=", val
     echo "v=", v
 
-echo "test2:-"
+when false:
+  proc outer*(s: string) =
+    var strg = s
+
+    proc inner() =
+      echo "inner says ", strg
+
+    echo "outer says hi"
+    inner()
+
+  outer("yo")
+  inner()
+
+when false:
+  # this fails because both innerP and strg not declared
+  # in the global scope, I was expecting the temp
+  template outerT*(s: string, body: stmt) =
+    var strg = s
+
+    proc innerP() =
+      echo "innerP called"
+
+    innerP()
+    echo "outerT says hi before body"
+    body
+    echo "outerT says hi after  body"
+
+  outerT "yo":
+    innerP()
+    echo "yo says hi", strg
+
+when false:
+  # this fails because strg is not defined
+  template outerT*(s: string, body: stmt) =
+    var strg = s
+
+    echo "outerT says hi before body"
+    body
+    echo "outerT says hi after  body"
+
+  outerT "yo":
+    echo "yo says hi ", strg
+
+when false:
+  # Succeeds
+  template outerT*(s: string, body: stmt) =
+    var strg = s
+
+    echo "outerT says hi before body"
+    body
+    echo "outerT says hi after  body"
+
+  outerT "yo":
+    echo "yo says hi"
+
+when true:
+  var strg = "global strg"
+
+  template outerT*(s: string, body: stmt) =
+    var strg = s
+    echo "outerT's strg=", strg
+    body
+
+  outerT("yo", echo("yo's body says hi ", strg))
+  outerT "me":
+   echo "me's body says hi ", strg
