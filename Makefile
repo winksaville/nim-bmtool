@@ -28,7 +28,7 @@ $(NIM_BIN_TEST1_TARGET): $(NIM_SRC_TEST1_TARGET).nim
 	@mkdir -p $(TEST_DIR)/bin
 	nim c $(NIM_FLAGS) $<
 
-build-test2: clean-tests $(NIM_BIN_TEST1_TARGET)
+build-test2: clean-tests $(NIM_BIN_TEST2_TARGET)
 
 run-test2: $(NIM_BIN_TEST2_TARGET)
 	./$(NIM_BIN_TEST2_TARGET) $(LOOPS)
