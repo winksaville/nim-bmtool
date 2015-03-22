@@ -1,68 +1,109 @@
 import bmtool, math, os
-import parseopt2, strutils, hashes, pegs
+import parseopt2, strutils, tables, pegs
 
-echo "paramCount=" & $paramCount() & " paramStr=" & $commandLineParams()
 
 var
   loops = 10
   time = 0.1
 
-for kind, key, val in getopt():
-  case kind:
-  of cmdShortOption, cmdLongOption:
-    echo "option: key=", key, " val=", val
-    case key:
-    of "l", "L": loops = parseInt(val)
-    of "t", "T": time = parseFloat(val)
-    else:
-      echo "option: ignore key=", key, " val=", val
-  of cmdArgument:
-    echo "cmdArgument: key=", key, " val=", val
+when true:
+  # Lean about simple hash tables and use them to create cmdArgsTable and cmdOptsTable
+  const
+    DBG_CL = true
 
-    # Use split
-    var px = peg"':'/'='"
-    var arg = split(key, px)
-    if arg.len > 0:
-      echo "cmdArgument: split px=", px, " arg=", $arg
-    else:
-      echo "cmdArgument: split failed"
+  var
+    cmdArgsTable = initTable[string, string]()
+    cmdOptsTable = initTable[string, string]()
 
-    # Using match
-    px = peg"{\ident}(':'/'='){.*}"
-    var matches: array[0..1, string]
-    if match(key, px, matches):
-      echo "cmdArgument: match px=", px
-      for i in 0..1:
-        echo "cmdArgument: matches[", i, "]",  matches[i]
-    else:
-      echo "cmdArgument: match failed"
+  when DBG_CL: echo "paramCount=" & $paramCount() & " paramStr=" & $commandLineParams()
+  for kind, key, val in getopt():
+    case kind:
+    of cmdShortOption, cmdLongOption:
+      cmdOptsTable[toLower(key)] = val
+      case key:
+      of "l", "L":
+        loops = parseInt(val)
+        when DBG_CL: echo "cmdArgument: loop=", loops
 
-    # Using match operator
-    px = peg"{\ident}(':'/'='){.*}"
-    if key =~ px:
-      echo "cmdArgument: px=", px
-      for i in 0..1:
-        echo "cmdArgument: matches[", i, "]",  matches[i]
+      of "t", "T":
+        time = parseFloat(val)
+        when DBG_CL: echo "cmdArgument: time=", time
+      else:
+        when DBG_CL: echo "option: ignore key=", key, " val=", val
+    of cmdArgument:
+      # Use split
+      var px = peg"':'/'='"
+      var arg = split(key, px)
+      if arg.len == 2:
+        when DBG_CL: echo "cmdArgument: arg=", $arg
+        cmdArgsTable[arg[0]] = arg[1]
+      else:
+        when DBG_CL: echo "cmdArgument: split failed"
     else:
-      echo "cmdArgument: match operator =~ failed"
+      when DBG_CL: echo "ignore: kind=", kind
 
-    # rawMatch would be useful if Captures.ml and Captures.matches
-    # where public, but since they aren't you can't do anything :(
-    #
-    # Also Captures.matches is limited to 20 matches as a
-    # fixed sized array, seems we should use sequences or
-    # at least take an openArray so it could parse "anything".
-    var c: Captures
-    var length = rawMatch(key, px, 0, c)
-    if length > 0:
-      echo "cmdArgument: rawMatch length=", length, " matches.len=", matches.len
+  when DBG_CL: echo "cmdArgument: cmdArgsTable=", cmdArgsTable
+  when DBG_CL: echo "cmdArgument: cmdOptsTable=", cmdOptsTable
+
+
+when false:
+  # Learn to use Pegs
+  for kind, key, val in getopt():
+    case kind:
+    of cmdShortOption, cmdLongOption:
+      echo "option: key=", key, " val=", val
+      case key:
+      of "l", "L": loops = parseInt(val)
+      of "t", "T": time = parseFloat(val)
+      else:
+        echo "option: ignore key=", key, " val=", val
+    of cmdArgument:
+      echo "cmdArgument: key=", key, " val=", val
+
+      # Use split
+      var px = peg"':'/'='"
+      var arg = split(key, px)
+      if arg.len > 0:
+        echo "cmdArgument: split px=", px, " arg=", $arg
+      else:
+        echo "cmdArgument: split failed"
+
+      # Using match
+      px = peg"{\ident}(':'/'='){.*}"
+      var matches: array[0..1, string]
+      if match(key, px, matches):
+        echo "cmdArgument: match px=", px
+        for i in 0..1:
+          echo "cmdArgument: matches[", i, "]",  matches[i]
+      else:
+        echo "cmdArgument: match failed"
+
+      # Using match operator
+      px = peg"{\ident}(':'/'='){.*}"
+      if key =~ px:
+        echo "cmdArgument: px=", px
+        for i in 0..1:
+          echo "cmdArgument: matches[", i, "]",  matches[i]
+      else:
+        echo "cmdArgument: match operator =~ failed"
+
+      # rawMatch would be useful if Captures.ml and Captures.matches
+      # where public, but since they aren't you can't do anything :(
+      #
+      # Also Captures.matches is limited to 20 matches as a
+      # fixed sized array, seems we should use sequences or
+      # at least take an openArray so it could parse "anything".
+      var c: Captures
+      var length = rawMatch(key, px, 0, c)
+      if length > 0:
+        echo "cmdArgument: rawMatch length=", length, " matches.len=", matches.len
+      else:
+        echo "cmdArgument: rawMatch failed"
     else:
-      echo "cmdArgument: rawMatch failed"
-  else:
-    echo "ignore: kind=", kind
+      echo "ignore: kind=", kind
 
-for cmd in commandLineParams():
-  echo "cmd=", cmd
+  for cmd in commandLineParams():
+    echo "cmd=", cmd
 
 when false:
   var
@@ -237,7 +278,7 @@ when false:
 
   delWaitingPeriod(wp)
 
-when true:
+when false:
   proc nada() =
     (discard)
 
