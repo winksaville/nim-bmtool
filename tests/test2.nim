@@ -7,14 +7,6 @@ var
   loops = 10
   time = 0.1
 
-proc xy(s: string) =
-  var matches: array[0..1, string]
-  var px = peg"{\ident}':'{.*}"
-  var length = matchLen(s, px, matches, 0)
-  echo "xy: length=", length, " matches.len=", matches.len
-  for i in 0..matches.len-1:
-    echo "xy: matches[", i, "]",  matches[i]
-
 for kind, key, val in getopt():
   case kind:
   of cmdShortOption, cmdLongOption:
@@ -25,17 +17,35 @@ for kind, key, val in getopt():
     else:
       echo "option: ignore key=", key, " val=", val
   of cmdArgument:
-    xy(key)
     echo "cmdArgument: key=", key, " val=", val
-    var arg = split(key, peg"\:")
-    echo "cmdArgument: arg=", $arg
 
-    var px = peg"{\ident}':'{.*}"
+    # Use split
+    var px = peg"':'/'='"
+    var arg = split(key, px)
+    if arg.len > 0:
+      echo "cmdArgument: split px=", px, " arg=", $arg
+    else:
+      echo "cmdArgument: split failed"
+
+    # Using match
+    px = peg"{\ident}(':'/'='){.*}"
     var matches: array[0..1, string]
-    var length = matchLen(key, px, matches)
-    echo "cmdArgument: number of chars matched length=", length
-    for i in 0..1:
-      echo "cmdArgument: matches[", i, "]",  matches[i]
+    if match(key, px, matches):
+      echo "cmdArgument: match px=", px
+      for i in 0..1:
+        echo "cmdArgument: matches[", i, "]",  matches[i]
+    else:
+      echo "cmdArgument: match failed"
+
+    # Using match operator
+    px = peg"{\ident}(':'/'='){.*}"
+    if key =~ px:
+      echo "cmdArgument: px=", px
+      for i in 0..1:
+        echo "cmdArgument: matches[", i, "]",  matches[i]
+    else:
+      echo "cmdArgument: match operator =~ failed"
+
     # rawMatch would be useful if Captures.ml and Captures.matches
     # where public, but since they aren't you can't do anything :(
     #
@@ -43,8 +53,11 @@ for kind, key, val in getopt():
     # fixed sized array, seems we should use sequences or
     # at least take an openArray so it could parse "anything".
     var c: Captures
-    length = rawMatch(key, px, 0, c)
-    echo "cmdArgument: length=", length, " matches.len=", matches.len
+    var length = rawMatch(key, px, 0, c)
+    if length > 0:
+      echo "cmdArgument: rawMatch length=", length, " matches.len=", matches.len
+    else:
+      echo "cmdArgument: rawMatch failed"
   else:
     echo "ignore: kind=", kind
 
