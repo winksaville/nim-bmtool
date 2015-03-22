@@ -359,7 +359,7 @@ proc delWaitingPeriod*(wp: ptr WaitingPeriod) =
 proc waiter*(wp: ptr WaitingPeriod) =
   ## Wait wp.seconds and set wp.done when complete
   wait(wp.seconds)
-  atomicstoreN(addr wp.done, true, ATOMIC_SEQ_CST)
+  atomicstoreN(addr wp.done, true, ATOMIC_RELEASE)
 
 template measureFor*(seconds: float, body: stmt): RunningStat =
   ## Meaure the execution time of body in a look timing each loop
@@ -377,7 +377,7 @@ template measureFor*(seconds: float, body: stmt): RunningStat =
   # we can't use spawn because we are passing a ptr
   # i.e a var and that's not allowed in spawn.
   createThread(wt, waiter, wp)
-  while not wp.done:
+  while not atomicLoadN(addr wp.done, ATOMIC_ACQUIRE):
     var begTuple = getBegCyclesTuple()
     body
     var endTuple = getEndCyclesTuple()
