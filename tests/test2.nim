@@ -6,44 +6,81 @@ var
   loops = 10
   time = 0.1
 
-when true:
-  # Lean about simple hash tables and use them to create cmdArgsTable and cmdOptsTable
-  const
-    DBG_CL = true
+# TODO: Move command line parsing to a module if this works out
+const
+  DBG_CL = false # Debug command line
 
-  var
-    cmdArgsTable = initTable[string, string]()
-    cmdOptsTable = initTable[string, string]()
+var
+  cmdArgsTable = initTable[string, string]()
+  cmdOptsTable = initTable[string, string]()
 
-  when DBG_CL: echo "paramCount=" & $paramCount() & " paramStr=" & $commandLineParams()
-  for kind, key, val in getopt():
-    case kind:
-    of cmdShortOption, cmdLongOption:
-      cmdOptsTable[toLower(key)] = val
-      case key:
-      of "l", "L":
-        loops = parseInt(val)
-        when DBG_CL: echo "cmdArgument: loop=", loops
-
-      of "t", "T":
-        time = parseFloat(val)
-        when DBG_CL: echo "cmdArgument: time=", time
-      else:
-        when DBG_CL: echo "option: ignore key=", key, " val=", val
-    of cmdArgument:
-      # Use split
-      var px = peg"':'/'='"
-      var arg = split(key, px)
-      if arg.len == 2:
-        when DBG_CL: echo "cmdArgument: arg=", $arg
-        cmdArgsTable[arg[0]] = arg[1]
-      else:
-        when DBG_CL: echo "cmdArgument: split failed"
+for kind, key, val in getopt():
+  case kind:
+  of cmdShortOption, cmdLongOption:
+    cmdOptsTable[toLower(key)] = val
+    case key:
+    of "l", "L":
+      loops = parseInt(val)
+    of "t", "T":
+      time = parseFloat(val)
     else:
-      when DBG_CL: echo "ignore: kind=", kind
+      discard
+  of cmdArgument:
+    # Use split to support named value pairs
+    var px = peg"':'/'='"
+    var arg = split(key, px)
+    if arg.len == 2:
+      cmdArgsTable[arg[0]] = arg[1]
+    elif arg.len == 1:
+      cmdArgsTable[arg[0]] = ""
+    else:
+      discard
+  else:
+    discard
 
-  when DBG_CL: echo "cmdArgument: cmdArgsTable=", cmdArgsTable
-  when DBG_CL: echo "cmdArgument: cmdOptsTable=", cmdOptsTable
+when DBG_CL: echo "cmdArgument: cmdArgsTable=", cmdArgsTable
+when DBG_CL: echo "cmdArgument: cmdOptsTable=", cmdOptsTable
+
+
+when false:
+  block:
+    # Lean about simple hash tables and use them to create cmdArgsTable and cmdOptsTable
+    var
+      cmdArgsTable = initTable[string, string]()
+      cmdOptsTable = initTable[string, string]()
+
+    when DBG_CL: echo "paramCount=" & $paramCount() & " paramStr=" & $commandLineParams()
+    for kind, key, val in getopt():
+      case kind:
+      of cmdShortOption, cmdLongOption:
+        cmdOptsTable[toLower(key)] = val
+        case key:
+        of "l", "L":
+          loops = parseInt(val)
+          when DBG_CL: echo "cmdArgument: loop=", loops
+
+        of "t", "T":
+          time = parseFloat(val)
+          when DBG_CL: echo "cmdArgument: time=", time
+        else:
+          when DBG_CL: echo "option: ignore key=", key, " val=", val
+      of cmdArgument:
+        # Use split
+        var px = peg"':'/'='"
+        var arg = split(key, px)
+        if arg.len == 2:
+          when DBG_CL: echo "cmdArgument: arg=", $arg
+          cmdArgsTable[arg[0]] = arg[1]
+        elif arg.len == 1:
+          when DBG_CL: echo "cmdArgument: arg=", $arg
+          cmdArgsTable[arg[0]] = ""
+        else:
+          when DBG_CL: echo "cmdArgument: split failed"
+      else:
+        when DBG_CL: echo "ignore: kind=", kind
+
+    when DBG_CL: echo "cmdArgument: cmdArgsTable=", cmdArgsTable
+    when DBG_CL: echo "cmdArgument: cmdOptsTable=", cmdOptsTable
 
 
 when false:
