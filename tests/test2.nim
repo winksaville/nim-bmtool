@@ -151,7 +151,7 @@ when false:
   outerT "yo":
     echo "yo says hi"
 
-when true:
+when false:
   var strg = "global strg"
 
   template outerT*(s: string, body: stmt) =
@@ -161,4 +161,21 @@ when true:
 
   outerT("yo", echo("yo's body says hi ", strg))
   outerT "me":
-   echo "me's body says hi ", strg
+    echo "me's body says hi ", strg
+
+when false:
+  var
+    wp =  newWaitingPeriod(2.0)
+
+  echo "call waiter wp=", wp
+  waiter(wp)
+  echo "waiter ret  wp=", wp
+
+  delWaitingPeriod(wp)
+
+when true:
+  proc nada() =
+    (discard)
+
+  var rs = measureFor(0.000_100, nada())
+  echo "rs=", rs

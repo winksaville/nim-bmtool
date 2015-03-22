@@ -2,10 +2,13 @@
 #   "How to Benchmark Code Execution Times on Intel IA-32 and IA-64 Instruction Set Architectures"
 # Here is a link to the document:
 #   https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CB4QFjAA&url=http%3A%2F%2Fwww.intel.com%2Fcontent%2Fdam%2Fwww%2Fpublic%2Fus%2Fen%2Fdocuments%2Fwhite-papers%2Fia-32-ia-64-benchmark-code-execution-paper.pdf&ei=GOAKVYnCGdLXoATpjYDACg&usg=AFQjCNEYjOs81ZAayyNeQkswpMNmra86Zg&sig2=EdYam2ml2Ch88rpRXhi4eQ&bvm=bv.88528373,d.cGU
-import math, times, timers, os
+import math, times, timers, os, posix
 
 proc `$`*(r: RunningStat): string =
   "{n=" & $r.n & " sum=" & $r.sum & " min=" & $r.min & " max=" & $r.max & " mean=" & $r.mean & "}"
+
+proc `$`*(ts: Ttimespec): string =
+  "{" & $cast[int](ts.tv_sec) & "," & $ts.tv_nsec & "}"
 
 proc getBegCyclesTuple*(): tuple[lo: uint32, hi: uint32] {.inline.} =
   # Somewhat dangerous because the compiler isn't tracking the name
@@ -166,20 +169,19 @@ proc measureCycles*(procedure: proc()): int64 =
   endCycles = int64(endLo) or (int64(endHi) shl 32)
   result = endCycles - begCycles
 
-template doBmCycles*(loops: int, procedure: proc()): RunningStat =
+proc doBmCycles*(loops: int, procedure: proc()): RunningStat =
   ## Uses measureCycles to return the RunningStat of executing the procedure parameter.
   ## Since measureCycles has asm statements that don't expand properly in templates we
   ## have to use a proc procedure. This is quite a bit less flexible then being able to
   ## pass an expression but yields probably the second best results but more testing needed.
   ##
   ## This does yield the do nothing proc call at 42 to 48 cycles on linux.
-  var result: RunningStat
   initialize()
   for idx in 0..loops-1:
     var cycles = measureCycles(procedure)
     if cycles >= 0:
       result.push(float(cycles))
-  result
+
 
 template doBmCycles2*(loops: int, body: stmt): RunningStat  =
   ## Uses getBegCyclesTuple/getEndCyclesTuple to get the cycles and returns the RunningStat.
@@ -312,7 +314,84 @@ template calibrate*(seconds: float, body: stmt): int =
   result = bestGuess
   result
 
-when true:
+var
+  gDone: bool
+
+proc wait*(seconds: float) =
+  ## This is equivalent to sleep(round(wp.seconds * 1000.0))
+  ## But is generally more robust as it is able to continue
+  ## waiting if it was interrupted. And is capable of waiting
+  ## for less than a millisecond.
+  if seconds <= 0.0:
+    return
+
+  var
+    sleepTime, remainingTime: Ttimespec
+  remainingTime.tv_sec = cast[Time](round(trunc(seconds)))
+  remainingTime.tv_nsec = round((seconds - trunc(seconds)) * 1.0e9)
+
+  var done = false
+  while not done:
+    sleepTime = remainingTime
+    var result = posix.nanosleep(sleepTime, remainingTime)
+    if result == 0 or result == -1 and posix.errno != EINTR:
+      # We completed successful or the error wasn't EINTR so be done
+      done = true
+
+type
+  WaitingPeriod* = object
+    seconds: float
+    done: bool
+
+proc `$`*(wp: ptr WaitingPeriod): string =
+  "{" & $wp.seconds & "," & $wp.done & "}"
+
+proc newWaitingPeriod*(seconds: float): ptr WaitingPeriod =
+  ## Return a new shareable WaitingPeriod
+  result = cast[ptr WaitingPeriod](allocShared(sizeof(WaitingPeriod)))
+  result.seconds = seconds
+  result.done = false
+
+proc delWaitingPeriod*(wp: ptr WaitingPeriod) =
+  ## Delete the shareable WaitingPeriod
+  deallocShared(wp)
+
+proc waiter*(wp: ptr WaitingPeriod) =
+  ## Wait wp.seconds and set wp.done when complete
+  wait(wp.seconds)
+  atomicstoreN(addr wp.done, true, ATOMIC_SEQ_CST)
+
+template measureFor*(seconds: float, body: stmt): RunningStat =
+  ## Meaure the execution time of body in a look timing each loop
+  ## and returning the RunningStat for the loop timings.
+
+  const DBG = false
+
+  var
+    result: RunningStat
+    wp: ptr WaitingPeriod
+    wt: TThread[ptr WaitingPeriod]
+
+  wp = newWaitingPeriod(seconds)
+  # TODO: We should wave a thread pool of waiters as
+  # we can't use spawn because we are passing a ptr
+  # i.e a var and that's not allowed in spawn.
+  createThread(wt, waiter, wp)
+  while not wp.done:
+    var begTuple = getBegCyclesTuple()
+    body
+    var endTuple = getEndCyclesTuple()
+    var bc = int64(begTuple.lo) or (int64(begTuple.hi) shl 32)
+    var ec = int64(endTuple.lo) or (int64(endTuple.hi) shl 32)
+    var duration = float(ec - bc)
+    when DBG: echo "duration=", duration, " ec=", float(ec), " bc=", float(bc)
+    if duration < 0:
+      when DBG: echo "bad duration=", duration, " ec=", float(ec), " bc=", float(bc)
+    else:
+      result.push(duration)
+  result
+
+when false:
   template benchSetupImpl*: stmt {.immediate, dirty.} = discard
 
   template benchSuite*(name: string, benchSuiteBody: stmt) {.immediate, dirty.} =
@@ -337,4 +416,3 @@ when true:
     when DBG: echo "loops=", loops
     rs = doBmCycles2(loops, benchBody)
     when DBG: echo "rs=", rs
-
