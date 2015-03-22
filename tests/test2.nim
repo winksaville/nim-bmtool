@@ -1,4 +1,55 @@
 import bmtool, math, os
+import parseopt2, strutils, hashes, pegs
+
+echo "paramCount=" & $paramCount() & " paramStr=" & $commandLineParams()
+
+var
+  loops = 10
+  time = 0.1
+
+proc xy(s: string) =
+  var matches: array[0..1, string]
+  var px = peg"{\ident}':'{.*}"
+  var length = matchLen(s, px, matches, 0)
+  echo "xy: length=", length, " matches.len=", matches.len
+  for i in 0..matches.len-1:
+    echo "xy: matches[", i, "]",  matches[i]
+
+for kind, key, val in getopt():
+  case kind:
+  of cmdShortOption, cmdLongOption:
+    echo "option: key=", key, " val=", val
+    case key:
+    of "l", "L": loops = parseInt(val)
+    of "t", "T": time = parseFloat(val)
+    else:
+      echo "option: ignore key=", key, " val=", val
+  of cmdArgument:
+    xy(key)
+    echo "cmdArgument: key=", key, " val=", val
+    var arg = split(key, peg"\:")
+    echo "cmdArgument: arg=", $arg
+
+    var px = peg"{\ident}':'{.*}"
+    var matches: array[0..1, string]
+    var length = matchLen(key, px, matches)
+    echo "cmdArgument: number of chars matched length=", length
+    for i in 0..1:
+      echo "cmdArgument: matches[", i, "]",  matches[i]
+    # rawMatch would be useful if Captures.ml and Captures.matches
+    # where public, but since they aren't you can't do anything :(
+    #
+    # Also Captures.matches is limited to 20 matches as a
+    # fixed sized array, seems we should use sequences or
+    # at least take an openArray so it could parse "anything".
+    var c: Captures
+    length = rawMatch(key, px, 0, c)
+    echo "cmdArgument: length=", length, " matches.len=", matches.len
+  else:
+    echo "ignore: kind=", kind
+
+for cmd in commandLineParams():
+  echo "cmd=", cmd
 
 when false:
   var
@@ -177,5 +228,5 @@ when true:
   proc nada() =
     (discard)
 
-  var rs = measureFor(0.000_100, nada())
+  var rs = measureFor(time, nada())
   echo "rs=", rs
