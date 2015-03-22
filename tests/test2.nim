@@ -315,9 +315,10 @@ when false:
 
   delWaitingPeriod(wp)
 
-when false:
+when true:
   proc nada() =
     (discard)
 
+  echo "measureFor: time=", time
   var rs = measureFor(time, nada())
   echo "rs=", rs
