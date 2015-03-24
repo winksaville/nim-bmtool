@@ -3,33 +3,33 @@ import bmtool, math
 echo "test1:+"
 
 var
-  loopsArray = [1_000, 10_000, 100_000, 1_000_000]
+  loopsArray = [1_000, 10_000, 100_000] #, 1_000_000, 10_000_000]
   empty: RunningStat
   stats1: RunningStat
   stats2: RunningStat
-  gInt: int
+  gInt1: int
   gInt2: int
 
 proc incg() =
-  gInt += 1
+  discard atomic_add_fetch(addr gInt1, 1, ATOMIC_RELAXED)
 
 proc inc2() =
-  gInt += 1
-  gInt2 += 1
-
+  atomicInc(gInt1, 1)
+  atomicInc(gInt2, 1)
 
 proc nada() =
   discard
 
 echo ""
 echo "Warm up the cpu"
-var rs = doBmCycles(10_000_000, nada)
+var rs = doBmCycles(10_000_000, nada())
 echo "warm up=", rs
 
+gInt1 = 1_000
 for loops in loopsArray:
-  empty = doBmCycles(loops, nada)
-  stats1 = doBmCycles(loops, incg)
-  stats2 = doBmCycles(loops, inc2)
+  empty = doBmCycles(loops, nada())
+  stats1 = doBmCycles(loops, incg())
+  stats2 = doBmCycles(loops, inc2())
 
   echo "cycles stats1 diff=", stats1.min - empty.min, " stats1.min=", stats1.min, " empty.min=", empty.min, " sum=", stats1.sum + empty.sum
   echo "cycles stats2 diff=", stats2.min - empty.min, " stats2.min=", stats2.min, " empty.min=", empty.min, " sum=", stats2.sum + empty.sum
@@ -47,7 +47,7 @@ echo ""
 
 var outerLoops = 1000
 var innerLoops = 1
-for z in 1..6:
+for z in 1..5:
   innerLoops *= 10
 
   empty = doBmTime(outerLoops, innerLoops, nada())

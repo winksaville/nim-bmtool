@@ -8,8 +8,10 @@ NIM_SRC_TEST2_TARGET=$(TEST_DIR)/test2
 NIM_BIN_TEST2_TARGET=$(TEST_DIR)/bin/test2
 
 NIM_FLAGS= -d:release
+#NIM_FLAGS= -d:release -d:useSysAssert -d:useGcAssert
 #NIM_FLAGS= -d:release -d:useSysAssert -d:useGcAssert --parallelBuild:1
 #NIM_FLAGS= -d:useSysAssert -d:useGcAssert
+#NIM_FLAGS= -d:useSysAssert -d:useGcAssert --parallelBuild:1
 
 all: test2
 #all: test1 test2
@@ -36,7 +38,7 @@ run-test2: $(NIM_BIN_TEST2_TARGET)
 # We need to makedir here because its not automatically created and linking fails
 $(NIM_BIN_TEST2_TARGET): $(NIM_SRC_TEST2_TARGET).nim
 	@mkdir -p $(TEST_DIR)/bin
-	nim c $(NIM_FLAGS) $<
+	nim c $(NIM_FLAGS)  $<
 
 build-bmtool:
 	@mkdir -p $(SRC_DIR)/bin

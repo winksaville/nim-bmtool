@@ -11,6 +11,9 @@ type
     ecx: int
     edx: int
 
+var
+  gInt2*: int
+
 proc `$`*(r: RunningStat): string =
   "{n=" & $r.n & " sum=" & $r.sum & " min=" & $r.min & " max=" & $r.max & " mean=" & $r.mean & "}"
 
@@ -21,33 +24,66 @@ proc `$`*(cpuid: CpuId): string =
   "{ eax=0x" & cpuid.eax.toHex(8) & " ebx=0x" & cpuid.ebx.toHex(8) & " ecx=0x" & cpuid.ecx.toHex(8) & " edx=0x" & cpuid.edx.toHex(8) & "}"
 
 
-proc intelinc*(param: int): int =
-  # Increment the input parameter
-  {.emit: """
-    asm volatile (".intel_syntax");
-    asm volatile (
-      "movq %%rax, %1\n\t"
-      "incq %%rax\n\t"
-      "movq %0, %%rax\n\t"
-      : "=r"(`result`)
-      : "r"(`param`));
-    asm volatile (".att_syntax");
-  """.}
-  return result
+when defined(macosx):
+  # Doesn't seem macosx support intel_syntax
+  # although it doesn't generate any errors the
+  # code doesn't increment the parameter
+  proc intelinc*(param: int): int =
+    # Increment the input parameter
+    {.emit: """
+      asm volatile (".att_syntax");
+      asm volatile (
+        "movq %1, %%rax\n\t"
+        "incq %%rax\n\t"
+        "movq %%rax, %0\n\t"
+        : "=r"(`result`)
+        : "r"(`param`));
+      asm volatile (".att_syntax");
+    """.}
+    return result
 
-proc testasm*(param: int): int =
-  # Increment the input parameter
-  {.emit: """
-    asm volatile (".att_syntax noprefix");
-    asm volatile (
-      "movq %1, rax\n\t"
-      "incq rax\n\t"
-      "movq rax, %0\n\t"
-      : "=r"(`result`)
-      : "r"(`param`));
-    asm volatile (".att_syntax");
-  """.}
-  return result
+  # mac does not support noprefix!!
+  proc testasm*(param: int): int =
+    # Increment the input parameter
+    {.emit: """
+      asm volatile (".att_syntax");
+      asm volatile (
+        "movq %1, %%rax\n\t"
+        "incq %%rax\n\t"
+        "movq %%rax, %0\n\t"
+        : "=r"(`result`)
+        : "r"(`param`));
+      asm volatile (".att_syntax");
+    """.}
+    return result
+else:
+  proc intelinc*(param: int): int =
+    # Increment the input parameter
+    {.emit: """
+      asm volatile (".intel_syntax");
+      asm volatile (
+        "movq %%rax, %1\n\t"
+        "incq %%rax\n\t"
+        "movq %0, %%rax\n\t"
+        : "=r"(`result`)
+        : "r"(`param`));
+      asm volatile (".att_syntax");
+    """.}
+    return result
+
+  proc testasm*(param: int): int =
+    # Increment the input parameter
+    {.emit: """
+      asm volatile (".att_syntax noprefix");
+      asm volatile (
+        "movq %1, rax\n\t"
+        "incq rax\n\t"
+        "movq rax, %0\n\t"
+        : "=r"(`result`)
+        : "r"(`param`));
+      asm volatile (".att_syntax");
+    """.}
+    return result
 
 proc cpuid*(ax_param: int): CpuId =
   {.emit: """
@@ -102,8 +138,6 @@ proc initializeCycles() {.inline.} =
 
 template doBmCycles*(loops: int, body: stmt): RunningStat =
   ## Uses measureCycles to return the RunningStat of executing the procedure parameter.
-  ##
-  ## This does yield the do nothing proc call at 42 to 48 cycles on linux.
   var result: RunningStat
   initializeCycles()
   for idx in 0..loops-1:
