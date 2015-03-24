@@ -338,35 +338,34 @@ template measureFor*(seconds: float, body: stmt): RunningStat =
   result
 
 when true:
-  template benchSetupImpl*: stmt {.immediate, dirty.} =
-    echo "benchSetupImpl: default"
 
-  template benchTeardownImpl*: stmt {.immediate, dirty.} =
-    echo "benchTeardownImpl: default"
+  template benchSetupImpl*: stmt {.immediate, dirty.} = discard
 
-  template benchSuite*(name: string, benchSuiteBody: stmt) {.immediate.} =
-    block:
-      echo "benchSuite: name=", name
+  template benchTeardownImpl*: stmt {.immediate, dirty.} = discard
 
-      template setup*(setupBody: stmt): stmt {.immediate, dirty.} =
-        template benchSetupImpl: stmt {.immediate, dirty.} = setupBody
+  # TODO: How to make suiteName available to benchSuiteBody
+  template benchSuite*(suiteName: expr, benchSuiteBody: stmt): stmt {.immediate, dirty.} =
+    echo "suite name=", suiteName
 
-      template teardown*(teardownBody: stmt): stmt {.immediate, dirty.} =
-        template benchTeardownImpl: stmt {.immediate, dirty.} = teardownBody
+    # TODO: setup and teardown are valid past the life time of a particulare benchSuite
+    # becuase benchSetupImpl and benchTeardownImpl are global so when setup and teardown
+    # are instantiated they remain after after a particlare benchSuite ends. Not the best
+    template setup*(setupBody: stmt): stmt {.immediate, dirty.} =
+      template benchSetupImpl: stmt {.immediate, dirty.} = setupBody
 
-      benchSuiteBody
+    template teardown*(teardownBody: stmt): stmt {.immediate, dirty.} =
+      template benchTeardownImpl: stmt {.immediate, dirty.} = teardownBody
 
-  template bench*(name: expr, runTime: float, benchBody: stmt): stmt {.immediate.} =
+    benchSuiteBody
+
+  # Pragma .dirty. is needed to inject benchSetupImpl and benchTeardownImpl and allow them to be overridden
+  # with each bench invocation. Pragma .immediate. is not needed because there is nothing to inject for benchBody?
+  #
+  # TODO: How to make benchName available to the bench and benchSuite?
+  template bench*(benchName: expr, runTime: float, runningStat: var RunningStat, benchBody: stmt): stmt {.immediate, dirty.} =
+    echo "bench name=", benchName
     benchSetupImpl()
 
-    const DBG = true
-    var
-      bnName = name
-      loops: int
-      rs: RunningStat
-
-    when DBG: echo "bench: time=", runTime
-    rs = measureFor(runTime, benchBody)
-    when DBG: echo "bench: rs=", rs
+    runningStat = measureFor(runTime, benchBody)
 
     benchTeardownImpl()

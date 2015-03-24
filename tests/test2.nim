@@ -330,7 +330,7 @@ when false:
     echo "rs=", rs
     echo ""
 
-when true:
+when false:
   if cmdArgs["v"] != nil:
     var v = parseInt(cmdArgs["v"])
     echo "v=", v
@@ -347,21 +347,46 @@ when true:
     proc nada() =
       (discard)
 
-    benchSuite "suite 1":
+    proc work() =
+      var val = 0
+      for i in 0..1_000:
+        val = atomic_add_fetch(addr val, 1, ATOMIC_RELAXED)
+
+    benchSuite "suite1":
+      var rs: RunningStat
+      var runTime = 0.100
+      var val: int
+
+      if cmdArgs["rt"] != nil:
+        runTime = parseFloat(cmdArgs["rt"])
+
+      # both setup are injected thus avaiable to subsequent benchSuite
+      # Not really what
       setup:
         echo "my setup"
-
       teardown:
         echo "my teardown"
 
-      bench "nada", 0.5:
+      bench "nada", 0.5, rs:
         nada()
+      echo "min=", rs.min, "\n"
 
-      var val = 0
-
-      bench "inc", 0.00001:
+      val = 0
+      bench "inc ATOMIC_RELAXED", runTime, rs:
         val = atomic_add_fetch(addr val, 1, ATOMIC_RELAXED)
-        echo "val=", val
+      echo "val=", val, " min=", rs.min, "\n"
 
-    echo ""
+      bench "inc ATOMIC_SEQ_CST", runTime, rs:
+        discard atomic_add_fetch(addr val, 1, ATOMIC_SEQ_CST)
+      echo "min=", rs.min , "\n"
+
+    benchSuite "suite2":
+      # BUG: We override setup but not teardown so teardown will be from suite1 :(
+      setup:
+        echo "work setup"
+
+      bench "work", runTime, rs:
+        work()
+      echo "min=", rs.min, "\n"
+
 

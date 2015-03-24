@@ -7,8 +7,8 @@ NIM_BIN_TEST1_TARGET=$(TEST_DIR)/bin/test1
 NIM_SRC_TEST2_TARGET=$(TEST_DIR)/test2
 NIM_BIN_TEST2_TARGET=$(TEST_DIR)/bin/test2
 
-NIM_FLAGS= -d:release
-#NIM_FLAGS= -d:release -d:useSysAssert -d:useGcAssert
+#NIM_FLAGS= -d:release
+NIM_FLAGS= -d:release -d:useSysAssert -d:useGcAssert
 #NIM_FLAGS= -d:release -d:useSysAssert -d:useGcAssert --parallelBuild:1
 #NIM_FLAGS= -d:useSysAssert -d:useGcAssert
 #NIM_FLAGS= -d:useSysAssert -d:useGcAssert --parallelBuild:1
