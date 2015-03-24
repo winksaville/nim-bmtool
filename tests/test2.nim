@@ -5,6 +5,7 @@ import parseopt2, strutils, tables, pegs
 var
   loops = 10
   time = 0.1
+  gInt = 3
 
 # TODO: Move command line parsing to a module if this works out
 const
@@ -42,7 +43,7 @@ when DBG_CL: echo "cmdArgument: cmdArgs=", cmdArgs
 when DBG_CL: echo "cmdArgument: cmdOpts=", cmdOpts
 
 
-when false:
+when true:
   block:
     # Lean about simple hash tables and use them to create cmdArgs and cmdOpts
     var
@@ -83,7 +84,7 @@ when false:
     when DBG_CL: echo "cmdArgument: cmdOpts=", cmdOpts
 
 
-when false:
+when true:
   # Learn to use Pegs
   for kind, key, val in getopt():
     case kind:
@@ -143,51 +144,48 @@ when false:
     echo "cmd=", cmd
 
 when false:
-  var
-    gInt: int = 3
-
+  # timeit won't compile, getting Error: value of type 'RunningStat' has to be discarded
   proc doNothing() =
     (discard)
 
   proc incg(v: int) =
     gInt += v
 
-  var loops: int
-
   loops = calibrate(1.0, doNothing())
   echo "calibrate doNothing loops=", loops
-  echo "time doNothing=", timeit(doBmCycles2(loops, doNothing()))
+  echo "time doNothing=", timeit(loops, doNothing())
   echo ""
-  #loops = calibrate(1.0, incg(2))
-  #echo "calibarte incg(2) loops=", loops
-  #echo "time incg(2)=", timeit(loops, incg(2))
-  #echo ""
-  #loops = calibrate(1.0, sleep(1))
-  #echo "calibrate sleep(1) loops=", loops
-  #echo "time sleep(1)=", timeit(loops, sleep(1))
-  #echo ""
-  #loops = calibrate(1.0, sleep(10))
-  #echo "calibrate sleep(10) loops=", loops
-  #echo "time sleep(10)=", timeit(loops, sleep(10))
-  #echo ""
-  #loops = calibrate(1.0, sleep(100))
-  #echo "calibrate sleep(100) loops=", loops
-  #echo "time sleep(100)=", timeit(loops, sleep(100))
-  #echo ""
-  #loops = calibrate(1.0, sleep(750))
-  #echo "calibrate sleep(750) loops=", loops
-  #echo "time sleep(750)=", timeit(loops, sleep(750))
-  #echo ""
-  #loops = calibrate(1.0, sleep(1_500))
-  #echo "calibrate sleep(1_500) loops=", loops
-  #echo "time sleep(1_500)=", timeit(loops, sleep(1_500))
-  #echo ""
-  #loops = calibrate(1.0, sleep(10_000))
-  #echo "calibrate sleep(10_000) loops=", loops
-  #echo "time sleep(10_00)=", timeit((for x in 0..loops-1: sleep(10_000)))
-  #echo ""
+  loops = calibrate(1.0, incg(2))
+  echo "calibarte incg(2) loops=", loops
+  echo "time incg(2)=", timeit(loops, incg(2))
+  echo ""
+  loops = calibrate(1.0, sleep(1))
+  echo "calibrate sleep(1) loops=", loops
+  echo "time sleep(1)=", timeit(loops, sleep(1))
+  echo ""
+  loops = calibrate(1.0, sleep(10))
+  echo "calibrate sleep(10) loops=", loops
+  echo "time sleep(10)=", timeit(loops, sleep(10))
+  echo ""
+  loops = calibrate(1.0, sleep(100))
+  echo "calibrate sleep(100) loops=", loops
+  echo "time sleep(100)=", timeit(loops, sleep(100))
+  echo ""
+  loops = calibrate(1.0, sleep(750))
+  echo "calibrate sleep(750) loops=", loops
+  echo "time sleep(750)=", timeit(loops, sleep(750))
+  echo ""
+  loops = calibrate(1.0, sleep(1_500))
+  echo "calibrate sleep(1_500) loops=", loops
+  echo "time sleep(1_500)=", timeit(loops, sleep(1_500))
+  echo ""
+  loops = calibrate(1.0, sleep(10_000))
+  echo "calibrate sleep(10_000) loops=", loops
+  echo "time sleep(10_00)=", timeit((for x in 0..loops-1: sleep(10_000)))
+  echo ""
 
 when false:
+  # timeit won't compile, getting Error: value of type 'RunningStat' has to be discarded
   block:
     proc nada() =
       (discard)
@@ -196,18 +194,19 @@ when false:
     echo "tlLoops=", tlLoops
     var
       tlRs: RunningStat
-    tlRs = doBmCycles2(tlLoops, nada())
+    tlRs = doBmCycles(tlLoops, nada())
     echo "tlRs=", tlRs
 
 when false:
-    proc nada() =
-      (discard)
+  # Benchmark not enable yet
+  proc nada() =
+    (discard)
 
-    benchSuite "suite 1":
-      bench "nada":
-        nada()
+  benchSuite "suite 1":
+    bench "nada":
+      nada()
 
-when false:
+when true:
 
   template initImpl*: stmt {.immediate, dirty.} = discard
 
@@ -232,13 +231,7 @@ when false:
       echo "do'n it"
 
 
-when false:
-  block:
-    var v = xyz()
-    echo "val=", val
-    echo "v=", v
-
-when false:
+when true:
   proc outer*(s: string) =
     var strg = s
 
@@ -249,7 +242,6 @@ when false:
     inner()
 
   outer("yo")
-  inner()
 
 when false:
   # this fails because both innerP and strg not declared
@@ -281,7 +273,7 @@ when false:
   outerT "yo":
     echo "yo says hi ", strg
 
-when false:
+when true:
   # Succeeds
   template outerT*(s: string, body: stmt) =
     var strg = s
@@ -293,7 +285,7 @@ when false:
   outerT "yo":
     echo "yo says hi"
 
-when false:
+when true:
   var strg = "global strg"
 
   template outerT*(s: string, body: stmt) =
@@ -305,7 +297,7 @@ when false:
   outerT "me":
     echo "me's body says hi ", strg
 
-when false:
+when true:
   var
     wp =  newWaitingPeriod(2.0)
 
@@ -316,8 +308,6 @@ when false:
   delWaitingPeriod(wp)
 
 when true:
-  var
-    gInt = 0
   proc nada() =
     gInt += 1
 
@@ -326,11 +316,12 @@ when true:
   echo "rs=", rs
 
 when true:
-  var i = intelinc(parseInt(cmdArgs["v"]))
-  echo "i=", i
-  var a = testasm(parseInt(cmdArgs["v"]))
-  echo "a=", a
-  var eax = parseInt(cmdArgs["eax"])
-  echo "eax=", eax
-  var id =cpuid(eax)
-  echo "id=", id
+  if cmdArgs["v"] != nil:
+    var v = parseInt(cmdArgs["v"])
+    echo "v=", v
+    echo "intelinc=", intelinc(v)
+    echo "testasm=", testasm(v)
+    echo "id=", cpuid(v)
+  else:
+    echo "Need command line <v=n> where n is some integer"
+
