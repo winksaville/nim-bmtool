@@ -11,13 +11,13 @@ const
   DBG_CL = false # Debug command line
 
 var
-  cmdArgsTable = initTable[string, string]()
-  cmdOptsTable = initTable[string, string]()
+  cmdArgs = initTable[string, string]()
+  cmdOpts = initTable[string, string]()
 
 for kind, key, val in getopt():
   case kind:
   of cmdShortOption, cmdLongOption:
-    cmdOptsTable[toLower(key)] = val
+    cmdOpts[toLower(key)] = val
     case key:
     of "l", "L":
       loops = parseInt(val)
@@ -30,30 +30,30 @@ for kind, key, val in getopt():
     var px = peg"':'/'='"
     var arg = split(key, px)
     if arg.len == 2:
-      cmdArgsTable[arg[0]] = arg[1]
+      cmdArgs[arg[0]] = arg[1]
     elif arg.len == 1:
-      cmdArgsTable[arg[0]] = ""
+      cmdArgs[arg[0]] = ""
     else:
       discard
   else:
     discard
 
-when DBG_CL: echo "cmdArgument: cmdArgsTable=", cmdArgsTable
-when DBG_CL: echo "cmdArgument: cmdOptsTable=", cmdOptsTable
+when DBG_CL: echo "cmdArgument: cmdArgs=", cmdArgs
+when DBG_CL: echo "cmdArgument: cmdOpts=", cmdOpts
 
 
 when false:
   block:
-    # Lean about simple hash tables and use them to create cmdArgsTable and cmdOptsTable
+    # Lean about simple hash tables and use them to create cmdArgs and cmdOpts
     var
-      cmdArgsTable = initTable[string, string]()
-      cmdOptsTable = initTable[string, string]()
+      cmdArgs = initTable[string, string]()
+      cmdOpts = initTable[string, string]()
 
     when DBG_CL: echo "paramCount=" & $paramCount() & " paramStr=" & $commandLineParams()
     for kind, key, val in getopt():
       case kind:
       of cmdShortOption, cmdLongOption:
-        cmdOptsTable[toLower(key)] = val
+        cmdOpts[toLower(key)] = val
         case key:
         of "l", "L":
           loops = parseInt(val)
@@ -70,17 +70,17 @@ when false:
         var arg = split(key, px)
         if arg.len == 2:
           when DBG_CL: echo "cmdArgument: arg=", $arg
-          cmdArgsTable[arg[0]] = arg[1]
+          cmdArgs[arg[0]] = arg[1]
         elif arg.len == 1:
           when DBG_CL: echo "cmdArgument: arg=", $arg
-          cmdArgsTable[arg[0]] = ""
+          cmdArgs[arg[0]] = ""
         else:
           when DBG_CL: echo "cmdArgument: split failed"
       else:
         when DBG_CL: echo "ignore: kind=", kind
 
-    when DBG_CL: echo "cmdArgument: cmdArgsTable=", cmdArgsTable
-    when DBG_CL: echo "cmdArgument: cmdOptsTable=", cmdOptsTable
+    when DBG_CL: echo "cmdArgument: cmdArgs=", cmdArgs
+    when DBG_CL: echo "cmdArgument: cmdOpts=", cmdOpts
 
 
 when false:
@@ -316,9 +316,21 @@ when false:
   delWaitingPeriod(wp)
 
 when true:
+  var
+    gInt = 0
   proc nada() =
-    (discard)
+    gInt += 1
 
   echo "measureFor: time=", time
   var rs = measureFor(time, nada())
   echo "rs=", rs
+
+when true:
+  var i = intelinc(parseInt(cmdArgs["v"]))
+  echo "i=", i
+  var a = testasm(parseInt(cmdArgs["v"]))
+  echo "a=", a
+  var eax = parseInt(cmdArgs["eax"])
+  echo "eax=", eax
+  var id =cpuid(eax)
+  echo "id=", id

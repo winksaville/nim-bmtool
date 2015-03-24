@@ -2,13 +2,175 @@
 #   "How to Benchmark Code Execution Times on Intel IA-32 and IA-64 Instruction Set Architectures"
 # Here is a link to the document:
 #   https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CB4QFjAA&url=http%3A%2F%2Fwww.intel.com%2Fcontent%2Fdam%2Fwww%2Fpublic%2Fus%2Fen%2Fdocuments%2Fwhite-papers%2Fia-32-ia-64-benchmark-code-execution-paper.pdf&ei=GOAKVYnCGdLXoATpjYDACg&usg=AFQjCNEYjOs81ZAayyNeQkswpMNmra86Zg&sig2=EdYam2ml2Ch88rpRXhi4eQ&bvm=bv.88528373,d.cGU
-import math, times, timers, os, posix
+import math, times, timers, os, posix, strutils
+
+type
+  CpuId = tuple
+    eax: int
+    ebx: int
+    ecx: int
+    edx: int
 
 proc `$`*(r: RunningStat): string =
   "{n=" & $r.n & " sum=" & $r.sum & " min=" & $r.min & " max=" & $r.max & " mean=" & $r.mean & "}"
 
 proc `$`*(ts: Ttimespec): string =
   "{" & $cast[int](ts.tv_sec) & "," & $ts.tv_nsec & "}"
+
+proc `$`*(cpuid: CpuId): string =
+  "{ eax=0x" & cpuid.eax.toHex(8) & " ebx=0x" & cpuid.ebx.toHex(8) & " ecx=0x" & cpuid.ecx.toHex(8) & " edx=0x" & cpuid.edx.toHex(8) & "}"
+
+
+proc intelinc*(param: int): int =
+  # Increment the input parameter
+  {.emit: """
+    asm volatile (".intel_syntax");
+    asm volatile (
+      "movq %%rax, %1\n\t"
+      "incq %%rax\n\t"
+      "movq %0, %%rax\n\t"
+      : "=r"(`result`)
+      : "r"(`param`));
+    asm volatile (".att_syntax");
+  """.}
+  return result
+
+proc testasm*(param: int): int =
+  # Increment the input parameter
+  {.emit: """
+    asm volatile (".att_syntax noprefix");
+    asm volatile (
+      "movq %1, rax\n\t"
+      "incq rax\n\t"
+      "movq rax, %0\n\t"
+      : "=r"(`result`)
+      : "r"(`param`));
+    asm volatile (".att_syntax");
+  """.}
+  return result
+
+proc cpuid*(ax_param: int): CpuId =
+  ## Return CpuId tuple
+  #
+  # Note: Just mentioning the output fields is enough to have the compiler
+  # store the information in the result field. Here is the code where I store
+  # them explicitly:
+  #
+  # {.emit: """
+  #   asm volatile (
+  #     "movq %4, %%rax\n\t"
+  #     "cpuid\n\t"
+  #     "movq %%rax, %0\n\t"
+  #     "movq %%rbx, %1\n\t"
+  #     "movq %%rcx, %2\n\t"
+  #     "movq %%rdx, %3\n\t"
+  #     : "=a"(`result.Field0`), "=b"(`result.Field1`), "=c"(`result.Field2`), "=d"(`result.Field3`)
+  #     : "r"(`ax_param`));
+  # """.}
+  #
+  # The generated code is below, notice the "NOT needed" lines i.e. moveq %rax, %rax ...
+  #
+  #  cpuid_139065:
+  #  .LFB38:
+  #  	.cfi_startproc
+  #  	pushq	%rbx	#
+  #  	.cfi_def_cfa_offset 16
+  #  	.cfi_offset 3, -16
+  #  	subq	$48, %rsp	#,
+  #  	.cfi_def_cfa_offset 64
+  #  	movq	%fs:40, %rax	#, tmp94
+  #  	movq	%rax, 40(%rsp)	# tmp94, D.4026
+  #  	xorl	%eax, %eax	# tmp94
+  #  #APP
+  #  # 213 "/home/wink/prgs/nim/bmtool/tests/nimcache/bmtool.c" 1
+  #  	movq %rsi, %rax	# axparam
+  #  	cpuid
+  #  	movq %rax, %rax	# tmp86  <<< NOT needed
+  #  	movq %rbx, %rbx	# tmp87  <<< NOT needed
+  #  	movq %rcx, %rcx	# tmp88  <<< NOT needed
+  #  	movq %rdx, %rdx	# tmp89  <<< NOT needed
+  #
+  #  # 0 "" 2
+  #  #NO_APP
+  #  	movq	%rdx, 24(%rsp)	# tmp89, result.Field3
+  #  	movq	%rdx, 24(%rdi)	# tmp89, <retval>
+  #  	movq	40(%rsp), %rdx	# D.4026, tmp95
+  #  	xorq	%fs:40, %rdx	#, tmp95
+  #  	movq	%rax, (%rsp)	# tmp86, result.Field0
+  #  	movq	%rbx, 8(%rsp)	# tmp87, result.Field1
+  #  	movq	%rcx, 16(%rsp)	# tmp88, result.Field2
+  #  	movq	%rax, (%rdi)	# tmp86, <retval>
+  #  	movq	%rbx, 8(%rdi)	# tmp87, <retval>
+  #  	movq	%rcx, 16(%rdi)	# tmp88, <retval>
+  #  	jne	.L32	#,
+  #  	addq	$48, %rsp	#,
+  #  	.cfi_remember_state
+  #  	.cfi_def_cfa_offset 16
+  #  	movq	%rdi, %rax	# .result_ptr,
+  #  	popq	%rbx	#
+  #  	.cfi_def_cfa_offset 8
+  #  	ret
+  #  .L32:
+  #  	.cfi_restore_state
+  #  	call	__stack_chk_fail	#
+  #  	.cfi_endproc
+  #
+  #
+
+  {.emit: """
+    asm volatile (
+      "movq %4, %%rax\n\t"
+      "cpuid\n\t"
+      : "=a"(`result.Field0`), "=b"(`result.Field1`), "=c"(`result.Field2`), "=d"(`result.Field3`)
+      : "r"(`ax_param`));
+  """.}
+
+  # In the above code, without the explicit moves, is better
+  # but there are still "NOT needed" instructions storing to result.FieldX.
+  # Where as the "actual" return value are the move instructions though (%rdi)
+  # where I've marked as "The real retval"
+  #
+  #  cpuid_139065:
+  #  .LFB38:
+  #  	.cfi_startproc
+  #  	pushq	%rbx	#
+  #  	.cfi_def_cfa_offset 16
+  #  	.cfi_offset 3, -16
+  #  	subq	$48, %rsp	#,
+  #  	.cfi_def_cfa_offset 64
+  #  	movq	%fs:40, %rax	#, tmp94
+  #  	movq	%rax, 40(%rsp)	# tmp94, D.4026
+  #  	xorl	%eax, %eax	# tmp94
+  #  #APP
+  #  # 213 "/home/wink/prgs/nim/bmtool/tests/nimcache/bmtool.c" 1
+  #  	movq %rsi, %rax	# axparam
+  #  	cpuid
+  #
+  #  # 0 "" 2
+  #  #NO_APP
+  #  	movq	%rdx, 24(%rsp)	# tmp89, result.Field3 <<< NOT needed
+  #  	movq	%rdx, 24(%rdi)	# tmp89, <retval> <<< The real retval
+  #  	movq	40(%rsp), %rdx	# D.4026, tmp95
+  #  	xorq	%fs:40, %rdx	#, tmp95
+  #  	movq	%rax, (%rsp)	# tmp86, result.Field0 <<< NOT needed
+  #  	movq	%rbx, 8(%rsp)	# tmp87, result.Field1 <<< NOT needed
+  #  	movq	%rcx, 16(%rsp)	# tmp88, result.Field2 <<< NOT needed
+  #  	movq	%rax, (%rdi)	# tmp86, <retval> << The real retval
+  #  	movq	%rbx, 8(%rdi)	# tmp87, <retval> << The real retval
+  #  	movq	%rcx, 16(%rdi)	# tmp88, <retval> << The real retval
+  #  	jne	.L32	#,
+  #  	addq	$48, %rsp	#,
+  #  	.cfi_remember_state
+  #  	.cfi_def_cfa_offset 16
+  #  	movq	%rdi, %rax	# .result_ptr,
+  #  	popq	%rbx	#
+  #  	.cfi_def_cfa_offset 8
+  #  	ret
+  #  .L32:
+  #  	.cfi_restore_state
+  #  	call	__stack_chk_fail	#
+  #  	.cfi_endproc
+  return result
 
 proc getBegCyclesTuple*(): tuple[lo: uint32, hi: uint32] {.inline.} =
   # Somewhat dangerous because the compiler isn't tracking the name
@@ -20,117 +182,76 @@ proc getBegCyclesTuple*(): tuple[lo: uint32, hi: uint32] {.inline.} =
   # This comment applies to getEndCycles too.
   {.emit: """
     asm volatile(
-      "cpuid\n"
-      : /* No output */
+      "cpuid\n\t"
+      : /* Throw away output */
       : /* No input */
-      : "%eax", "%ebx", "%ecx", "%edx");
+      : "%rax", "%rbx", "%rcx", "%rdx");
   """.}
   {.emit: """
     asm volatile(
-      "rdtsc\n"
+      "rdtsc\n\t"
+      "mov %%eax, %0\n\t"
+      "mov %%edx, %1\n\t"
       :"=a"(`result.Field0`), "=d"(`result.Field1`));
   """.}
   return result
-
-proc getBegCycles*(): int64 {.inline.} =
-  var lo, hi: uint32
-  {.emit: """
-    asm volatile(
-      "cpuid\n"
-      : /* No output */
-      : /* No input */
-      : "%eax", "%ebx", "%ecx", "%edx");
-  """.}
-  {.emit: """
-    asm volatile(
-      "rdtsc\n"
-      :"=a"(`lo`), "=d"(`hi`));
-  """.}
-  result = int64(lo) or (int64(hi) shl 32)
 
 proc getEndCyclesTuple*(): tuple[lo: uint32, hi: uint32] {.inline.} =
   {.emit: """
     asm volatile(
-      "rdtscp\n"
+      "rdtscp\n\t"
       :"=a"(`result.Field0`), "=d"(`result.Field1`));
   """.}
   {.emit: """
     asm volatile(
-      "cpuid\n"
-      : /* No output */
+      "cpuid\n\t"
+      : /* Throw away output */
       : /* No input */
-      : "%eax", "%ebx", "%ecx", "%edx");
+      : "%rax", "%rbx", "%rcx", "%rdx");
   """.}
   return result
 
-proc getEndCycles*(): int64 {.inline.} =
-  var lo, hi: uint32
+proc cpuid() {.inline.} =
   {.emit: """
-    asm volatile(
-      "rdtscp\n"
-      :"=a"(`lo`), "=d"(`hi`));
-  """.}
-  {.emit: """
-    asm volatile(
-      "cpuid\n"
-      : /* No output */
+    asm volatile (
+      "cpuid\n\t"
+      : /* Throw away output */
       : /* No input */
       : "%eax", "%ebx", "%ecx", "%edx");
+  """.}
+
+proc rdtsc*(): int64 {.inline.} =
+  var lo, hi: uint32
+  {.emit: """
+    asm volatile (
+      "rdtsc\n\t"
+      :"=a"(`lo`), "=d"(`hi`));
   """.}
   result = int64(lo) or (int64(hi) shl 32)
 
-proc initialize*() =
+proc rdtscp*(): int64 {.inline.} =
+  var lo, hi: uint32
+  {.emit: """
+    asm volatile (
+      "rdtscp\n\t"
+      :"=a"(`lo`), "=d"(`hi`));
+  """.}
+  result = int64(lo) or (int64(hi) shl 32)
+
+proc getBegCycles*(): int64 {.inline.} =
+  cpuid()
+  result = rdtsc()
+
+proc getEndCycles*(): int64 {.inline.} =
+  result = rdtscp()
+  cpuid()
+
+proc initializeCycles() {.inline.} =
   ## Initalize as per the ia32-ia64-benchmark document
-  var begLo, begHi: uint32
-  var endLo, endHi: uint32
-  {.emit: """
-    asm volatile(
-      "cpuid\n"
-      : /* No output */
-      : /* No input */
-      : "%eax", "%ebx", "%ecx", "%edx");
-  """.}
-  {.emit: """
-    asm volatile(
-      "rdtsc\n"
-      :"=a"(`begLo`), "=d"(`begHi`));
-  """.}
-  {.emit: """
-    asm volatile(
-      "rdtscp\n"
-      :"=a"(`endLo`), "=d"(`endHi`));
-  """.}
-  {.emit: """
-    asm volatile(
-      "cpuid\n"
-      : /* No output */
-      : /* No input */
-      : "%eax", "%ebx", "%ecx", "%edx");
-  """.}
-  {.emit: """
-    asm volatile(
-      "cpuid\n"
-      : /* No output */
-      : /* No input */
-      : "%eax", "%ebx", "%ecx", "%edx");
-  """.}
-  {.emit: """
-    asm volatile(
-      "rdtsc\n"
-      :"=a"(`begLo`), "=d"(`begHi`));
-  """.}
-  {.emit: """
-    asm volatile(
-      "rdtscp\n"
-      :"=a"(`endLo`), "=d"(`endHi`));
-  """.}
-  {.emit: """
-    asm volatile(
-      "cpuid\n"
-      : /* No output */
-      : /* No input */
-      : "%eax", "%ebx", "%ecx", "%edx");
-  """.}
+  discard getBegCycles()
+  discard getEndCycles()
+  discard getBegCycles()
+  discard getEndCycles()
 
 proc measureCycles*(procedure: proc()): int64 =
   ## Returns number of cycles to execute the procedure parameter.
@@ -142,26 +263,26 @@ proc measureCycles*(procedure: proc()): int64 =
   var begCycles, endCycles: int64
   {.emit: """
     asm volatile(
-      "cpuid\n"
-      : /* No output */
+      "cpuid\n\t"
+      : /* Throw away output */
       : /* No input */
       : "%eax", "%ebx", "%ecx", "%edx");
   """.}
   {.emit: """
     asm volatile(
-      "rdtsc\n"
+      "rdtsc\n\t"
       :"=a"(`begLo`), "=d"(`begHi`));
   """.}
   procedure()
   {.emit: """
     asm volatile(
-      "rdtsc\n"
+      "rdtsc\n\t"
       :"=a"(`endLo`), "=d"(`endHi`));
   """.}
   {.emit: """
     asm volatile(
-      "cpuid\n"
-      : /* No output */
+      "cpuid\n\t"
+      : /* Throw away output */
       : /* No input */
       : "%eax", "%ebx", "%ecx", "%edx");
   """.}
@@ -176,7 +297,7 @@ proc doBmCycles*(loops: int, procedure: proc()): RunningStat =
   ## pass an expression but yields probably the second best results but more testing needed.
   ##
   ## This does yield the do nothing proc call at 42 to 48 cycles on linux.
-  initialize()
+  initializeCycles()
   for idx in 0..loops-1:
     var cycles = measureCycles(procedure)
     if cycles >= 0:
@@ -189,7 +310,7 @@ template doBmCycles2*(loops: int, body: stmt): RunningStat  =
   ## This does yield the do nothing proc call at 78 to 81 cycles fairly consistently on linux.
   const DBG = false
   var result: RunningStat
-  initialize()
+  initializeCycles()
   for idx in 0..loops-1:
     var begTuple = getBegCyclesTuple()
     body
@@ -209,7 +330,7 @@ template doBmCycles3*(loops: int, body: stmt): RunningStat =
   ## Performance: This does yield the do nothing proc call at 81 to 93 cycles on linux.
   const DBG = false
   var result: RunningStat
-  initialize()
+  initializeCycles()
   for idx in 0..loops-1:
     var bc = getBegCycles()
     body
@@ -377,12 +498,12 @@ template measureFor*(seconds: float, body: stmt): RunningStat =
   # we can't use spawn because we are passing a ptr
   # i.e a var and that's not allowed in spawn.
   createThread(wt, waiter, wp)
+
+  initializeCycles()
   while not atomicLoadN(addr wp.done, ATOMIC_ACQUIRE):
-    var begTuple = getBegCyclesTuple()
+    var bc = getBegCycles()
     body
-    var endTuple = getEndCyclesTuple()
-    var bc = int64(begTuple.lo) or (int64(begTuple.hi) shl 32)
-    var ec = int64(endTuple.lo) or (int64(endTuple.hi) shl 32)
+    var ec = getEndCycles()
     var duration = float(ec - bc)
     when DBG: echo "duration=", duration, " ec=", float(ec), " bc=", float(bc)
     if duration < 0:
