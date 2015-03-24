@@ -43,7 +43,7 @@ when DBG_CL: echo "cmdArgument: cmdArgs=", cmdArgs
 when DBG_CL: echo "cmdArgument: cmdOpts=", cmdOpts
 
 
-when true:
+when false:
   block:
     # Lean about simple hash tables and use them to create cmdArgs and cmdOpts
     var
@@ -85,7 +85,7 @@ when true:
     echo ""
 
 
-when true:
+when false:
   # Learn to use Pegs
   for kind, key, val in getopt():
     case kind:
@@ -145,59 +145,60 @@ when true:
     echo "cmd=", cmd
   echo ""
 
-when true:
-  # The measureFor is better :)
-  proc doNothing() =
-    (discard)
+when false:
+  block:
+    # The measureFor is better :)
+    proc doNothing() =
+      (discard)
 
-  proc incg(v: int) =
-    gInt += v
+    proc incg(v: int) =
+      gInt += v
 
-  var
-    rs1: RunningStat
-    runTime: float
+    var
+      rs1: RunningStat
+      runTime: float
 
-  # Use the X style, not sure it better but is an alternative and
-  # allows you to use the "special syntax". The surprising thing
-  # is that I had to append the X instead of overloading the template!
-  loops = doBmCyclesCalibration(1.0, doNothing())
-  echo "doBmCyclesCalibration doNothing loops=", loops
-  timeitX runTime:
-    doBmCyclesX loops, rs1:
-      doNothing()
-  echo "time doNothing=", runTime, " rs1=", rs1
-  echo ""
+    # Use the X style, not sure it better but is an alternative and
+    # allows you to use the "special syntax". The surprising thing
+    # is that I had to append the X instead of overloading the template!
+    loops = doBmCyclesCalibration(1.0, doNothing())
+    echo "doBmCyclesCalibration doNothing loops=", loops
+    timeitX runTime:
+      doBmCyclesX loops, rs1:
+        doNothing()
+    echo "time doNothing=", runTime, " rs1=", rs1
+    echo ""
 
-  loops = doBmCyclesCalibration(1.0, incg(2))
-  echo "calibarte incg(2) loops=", loops
-  echo "time incg(2)=", timeit((rs1 = doBmCycles(loops, incg(2))))
-  echo ""
-  loops = doBmCyclesCalibration(1.0, sleep(1))
-  echo "doBmCyclesCalibration sleep(1) loops=", loops
-  echo "time sleep(1)=", timeit((discard doBmCycles(loops, sleep(1))))
-  echo ""
-  loops = doBmCyclesCalibration(1.0, sleep(10))
-  echo "doBmCyclesCalibration sleep(10) loops=", loops
-  echo "time sleep(10)=", timeit((discard doBmCycles(loops, sleep(10))))
-  echo ""
-  loops = doBmCyclesCalibration(1.0, sleep(100))
-  echo "doBmCyclesCalibration sleep(100) loops=", loops
-  echo "time sleep(100)=", timeit((discard doBmCycles(loops, sleep(100))))
-  echo ""
-  loops = doBmCyclesCalibration(1.0, sleep(750))
-  echo "doBmCyclesCalibration sleep(750) loops=", loops
-  echo "time sleep(750)=", timeit((discard doBmCycles(loops, sleep(750))))
-  echo ""
-  loops = doBmCyclesCalibration(1.0, sleep(1_500))
-  echo "doBmCyclesCalibration sleep(1_500) loops=", loops
-  echo "time sleep(1_500)=", timeit((discard doBmCycles(loops, sleep(1_500))))
-  echo ""
-  loops = doBmCyclesCalibration(1.0, sleep(10_000))
-  echo "doBmCyclesCalibration sleep(10_000) loops=", loops
-  echo "time sleep(10_00)=", timeit((discard doBmCycles(loops, (for x in 0..loops-1: sleep(10_000)))))
-  echo ""
+    loops = doBmCyclesCalibration(1.0, incg(2))
+    echo "calibarte incg(2) loops=", loops
+    echo "time incg(2)=", timeit((rs1 = doBmCycles(loops, incg(2))))
+    echo ""
+    loops = doBmCyclesCalibration(1.0, sleep(1))
+    echo "doBmCyclesCalibration sleep(1) loops=", loops
+    echo "time sleep(1)=", timeit((discard doBmCycles(loops, sleep(1))))
+    echo ""
+    loops = doBmCyclesCalibration(1.0, sleep(10))
+    echo "doBmCyclesCalibration sleep(10) loops=", loops
+    echo "time sleep(10)=", timeit((discard doBmCycles(loops, sleep(10))))
+    echo ""
+    loops = doBmCyclesCalibration(1.0, sleep(100))
+    echo "doBmCyclesCalibration sleep(100) loops=", loops
+    echo "time sleep(100)=", timeit((discard doBmCycles(loops, sleep(100))))
+    echo ""
+    loops = doBmCyclesCalibration(1.0, sleep(750))
+    echo "doBmCyclesCalibration sleep(750) loops=", loops
+    echo "time sleep(750)=", timeit((discard doBmCycles(loops, sleep(750))))
+    echo ""
+    loops = doBmCyclesCalibration(1.0, sleep(1_500))
+    echo "doBmCyclesCalibration sleep(1_500) loops=", loops
+    echo "time sleep(1_500)=", timeit((discard doBmCycles(loops, sleep(1_500))))
+    echo ""
+    loops = doBmCyclesCalibration(1.0, sleep(10_000))
+    echo "doBmCyclesCalibration sleep(10_000) loops=", loops
+    echo "time sleep(10_00)=", timeit((discard doBmCycles(loops, (for x in 0..loops-1: sleep(10_000)))))
+    echo ""
 
-when true:
+when false:
   block:
     proc nada() =
       (discard)
@@ -214,16 +215,6 @@ when true:
     echo ""
 
 when false:
-  # Benchmark not enable yet
-  proc nada() =
-    (discard)
-
-  benchSuite "suite 1":
-    bench "nada":
-      nada()
-  echo ""
-
-when true:
 
   template initImpl*: stmt {.immediate, dirty.} = discard
 
@@ -249,7 +240,7 @@ when true:
   echo ""
 
 
-when true:
+when false:
   proc outer*(s: string) =
     var strg = s
 
@@ -292,7 +283,7 @@ when false:
   outerT "yo":
     echo "yo says hi ", strg
 
-when true:
+when false:
   # Succeeds
   template outerT*(s: string, body: stmt) =
     var strg = s
@@ -305,7 +296,7 @@ when true:
     echo "yo says hi"
   echo ""
 
-when true:
+when false:
   var strg = "global strg"
 
   template outerT*(s: string, body: stmt) =
@@ -318,7 +309,7 @@ when true:
     echo "me's body says hi ", strg
   echo ""
 
-when true:
+when false:
   var
     wp =  newWaitingPeriod(2.0)
 
@@ -329,14 +320,15 @@ when true:
   delWaitingPeriod(wp)
   echo ""
 
-when true:
-  proc nada() =
-    gInt += 1
+when false:
+  block:
+    proc nada() =
+      gInt += 1
 
-  echo "measureFor: time=", time
-  var rs = measureFor(time, nada())
-  echo "rs=", rs
-  echo ""
+    echo "measureFor: time=", time
+    var rs = measureFor(time, nada())
+    echo "rs=", rs
+    echo ""
 
 when true:
   if cmdArgs["v"] != nil:
@@ -348,4 +340,28 @@ when true:
   else:
     echo "Need command line <v=n> where n is some integer"
   echo ""
+
+when true:
+  block:
+    # Benchmark not enable yet
+    proc nada() =
+      (discard)
+
+    benchSuite "suite 1":
+      setup:
+        echo "my setup"
+
+      teardown:
+        echo "my teardown"
+
+      bench "nada", 0.5:
+        nada()
+
+      var val = 0
+
+      bench "inc", 0.00001:
+        val = atomic_add_fetch(addr val, 1, ATOMIC_RELAXED)
+        echo "val=", val
+
+    echo ""
 

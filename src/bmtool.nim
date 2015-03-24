@@ -337,19 +337,26 @@ template measureFor*(seconds: float, body: stmt): RunningStat =
   delWaitingPeriod(wp)
   result
 
-when false:
-  template benchSetupImpl*: stmt {.immediate, dirty.} = discard
+when true:
+  template benchSetupImpl*: stmt {.immediate, dirty.} =
+    echo "benchSetupImpl: default"
 
-  template benchSuite*(name: string, benchSuiteBody: stmt) {.immediate, dirty.} =
+  template benchTeardownImpl*: stmt {.immediate, dirty.} =
+    echo "benchTeardownImpl: default"
+
+  template benchSuite*(name: string, benchSuiteBody: stmt) {.immediate.} =
     block:
       echo "benchSuite: name=", name
 
       template setup*(setupBody: stmt): stmt {.immediate, dirty.} =
         template benchSetupImpl: stmt {.immediate, dirty.} = setupBody
 
+      template teardown*(teardownBody: stmt): stmt {.immediate, dirty.} =
+        template benchTeardownImpl: stmt {.immediate, dirty.} = teardownBody
+
       benchSuiteBody
 
-  template bench*(name: expr, benchBody: stmt): stmt {.immediate, dirty.} =
+  template bench*(name: expr, runTime: float, benchBody: stmt): stmt {.immediate.} =
     benchSetupImpl()
 
     const DBG = true
@@ -358,7 +365,8 @@ when false:
       loops: int
       rs: RunningStat
 
-    loops = calibrate(1.0, benchBody)
-    when DBG: echo "loops=", loops
-    rs = doBmCycles(loops, benchBody)
-    when DBG: echo "rs=", rs
+    when DBG: echo "bench: time=", runTime
+    rs = measureFor(runTime, benchBody)
+    when DBG: echo "bench: rs=", rs
+
+    benchTeardownImpl()
