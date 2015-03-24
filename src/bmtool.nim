@@ -148,6 +148,16 @@ template doBmCycles*(loops: int, body: stmt): RunningStat =
       result.push(float(cycles))
   result
 
+template doBmCyclesX*(loops: int, rs: var RunningStat, body: stmt) =
+  ## Uses measureCycles to return the RunningStat of executing the procedure parameter.
+  initializeCycles()
+  for idx in 0..loops-1:
+    var begCycles = getBegCycles()
+    body
+    var cycles = getEndCycles() - begCycles
+    if cycles >= 0:
+      rs.push(float(cycles))
+
 template doBmTicks*(loops: int, body: stmt): RunningStat =
   ## Uses getTicks to return the RunningStat of executing the body parameter.
   ## On the mac this uses  mac specific and yeilds probably the most consistent results.
@@ -187,8 +197,8 @@ template doBmTime*(loops: int, innerLoops: int, body: stmt): RunningStat =
       result.push(duration)
   result
 
-# Execute body loops times and return nanosecs to run
 template timeit*(body: stmt): float =
+  ## Execute body and return nanosecs to run
   var
     result: float
     startTime: float
@@ -198,7 +208,18 @@ template timeit*(body: stmt): float =
   result = epochTime() - startTime
   result
 
-template calibrate*(seconds: float, body: stmt): int =
+template timeitX*(time: var float, body: stmt) =
+  ## Execute body and return nanosecs to run in time
+  var
+    startTime: float
+
+  startTime = epochTime()
+  body
+  time = epochTime() - startTime
+
+template doBmCyclesCalibration*(seconds: float, body: stmt): int =
+  ## Calibrate number of loops doBmCycles needs to execute for
+  ## the time specified by the seconds parameter.
   const DBG = false
   var
     result: int
@@ -235,7 +256,7 @@ template calibrate*(seconds: float, body: stmt): int =
       bestGuess = 1
       when DBG: echo("calibrate:  body takes too long, return 1")
       break
-    time = timeit(doBmCycles(bestGuess, body))
+    time = timeit((discard doBmCycles(bestGuess, body)))
 
   when DBG: echo("calibrate:- time=", time, " bestGuess=", bestGuess)
   result = bestGuess

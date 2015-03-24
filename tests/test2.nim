@@ -82,6 +82,7 @@ when true:
 
     when DBG_CL: echo "cmdArgument: cmdArgs=", cmdArgs
     when DBG_CL: echo "cmdArgument: cmdOpts=", cmdOpts
+    echo ""
 
 
 when true:
@@ -142,60 +143,75 @@ when true:
 
   for cmd in commandLineParams():
     echo "cmd=", cmd
+  echo ""
 
-when false:
-  # timeit won't compile, getting Error: value of type 'RunningStat' has to be discarded
+when true:
+  # The measureFor is better :)
   proc doNothing() =
     (discard)
 
   proc incg(v: int) =
     gInt += v
 
-  loops = calibrate(1.0, doNothing())
-  echo "calibrate doNothing loops=", loops
-  echo "time doNothing=", timeit(loops, doNothing())
-  echo ""
-  loops = calibrate(1.0, incg(2))
-  echo "calibarte incg(2) loops=", loops
-  echo "time incg(2)=", timeit(loops, incg(2))
-  echo ""
-  loops = calibrate(1.0, sleep(1))
-  echo "calibrate sleep(1) loops=", loops
-  echo "time sleep(1)=", timeit(loops, sleep(1))
-  echo ""
-  loops = calibrate(1.0, sleep(10))
-  echo "calibrate sleep(10) loops=", loops
-  echo "time sleep(10)=", timeit(loops, sleep(10))
-  echo ""
-  loops = calibrate(1.0, sleep(100))
-  echo "calibrate sleep(100) loops=", loops
-  echo "time sleep(100)=", timeit(loops, sleep(100))
-  echo ""
-  loops = calibrate(1.0, sleep(750))
-  echo "calibrate sleep(750) loops=", loops
-  echo "time sleep(750)=", timeit(loops, sleep(750))
-  echo ""
-  loops = calibrate(1.0, sleep(1_500))
-  echo "calibrate sleep(1_500) loops=", loops
-  echo "time sleep(1_500)=", timeit(loops, sleep(1_500))
-  echo ""
-  loops = calibrate(1.0, sleep(10_000))
-  echo "calibrate sleep(10_000) loops=", loops
-  echo "time sleep(10_00)=", timeit((for x in 0..loops-1: sleep(10_000)))
+  var
+    rs1: RunningStat
+    runTime: float
+
+  # Use the X style, not sure it better but is an alternative and
+  # allows you to use the "special syntax". The surprising thing
+  # is that I had to append the X instead of overloading the template!
+  loops = doBmCyclesCalibration(1.0, doNothing())
+  echo "doBmCyclesCalibration doNothing loops=", loops
+  timeitX runTime:
+    doBmCyclesX loops, rs1:
+      doNothing()
+  echo "time doNothing=", runTime, " rs1=", rs1
   echo ""
 
-when false:
-  # timeit won't compile, getting Error: value of type 'RunningStat' has to be discarded
+  loops = doBmCyclesCalibration(1.0, incg(2))
+  echo "calibarte incg(2) loops=", loops
+  echo "time incg(2)=", timeit((rs1 = doBmCycles(loops, incg(2))))
+  echo ""
+  loops = doBmCyclesCalibration(1.0, sleep(1))
+  echo "doBmCyclesCalibration sleep(1) loops=", loops
+  echo "time sleep(1)=", timeit((discard doBmCycles(loops, sleep(1))))
+  echo ""
+  loops = doBmCyclesCalibration(1.0, sleep(10))
+  echo "doBmCyclesCalibration sleep(10) loops=", loops
+  echo "time sleep(10)=", timeit((discard doBmCycles(loops, sleep(10))))
+  echo ""
+  loops = doBmCyclesCalibration(1.0, sleep(100))
+  echo "doBmCyclesCalibration sleep(100) loops=", loops
+  echo "time sleep(100)=", timeit((discard doBmCycles(loops, sleep(100))))
+  echo ""
+  loops = doBmCyclesCalibration(1.0, sleep(750))
+  echo "doBmCyclesCalibration sleep(750) loops=", loops
+  echo "time sleep(750)=", timeit((discard doBmCycles(loops, sleep(750))))
+  echo ""
+  loops = doBmCyclesCalibration(1.0, sleep(1_500))
+  echo "doBmCyclesCalibration sleep(1_500) loops=", loops
+  echo "time sleep(1_500)=", timeit((discard doBmCycles(loops, sleep(1_500))))
+  echo ""
+  loops = doBmCyclesCalibration(1.0, sleep(10_000))
+  echo "doBmCyclesCalibration sleep(10_000) loops=", loops
+  echo "time sleep(10_00)=", timeit((discard doBmCycles(loops, (for x in 0..loops-1: sleep(10_000)))))
+  echo ""
+
+when true:
   block:
     proc nada() =
       (discard)
 
-    var tlLoops = calibrate(1.0, nada())
+    var tlLoops = doBmCyclesCalibration(1.0, nada())
     echo "tlLoops=", tlLoops
     var
       tlRs: RunningStat
     tlRs = doBmCycles(tlLoops, nada())
     echo "tlRs=", tlRs
+    doBmCyclesX tlLoops, tlRs:
+      nada()
+    echo "tlRs=", tlRs
+    echo ""
 
 when false:
   # Benchmark not enable yet
@@ -205,6 +221,7 @@ when false:
   benchSuite "suite 1":
     bench "nada":
       nada()
+  echo ""
 
 when true:
 
@@ -229,6 +246,7 @@ when true:
 
     doit "doit1":
       echo "do'n it"
+  echo ""
 
 
 when true:
@@ -242,6 +260,7 @@ when true:
     inner()
 
   outer("yo")
+  echo ""
 
 when false:
   # this fails because both innerP and strg not declared
@@ -284,6 +303,7 @@ when true:
 
   outerT "yo":
     echo "yo says hi"
+  echo ""
 
 when true:
   var strg = "global strg"
@@ -296,6 +316,7 @@ when true:
   outerT("yo", echo("yo's body says hi ", strg))
   outerT "me":
     echo "me's body says hi ", strg
+  echo ""
 
 when true:
   var
@@ -306,6 +327,7 @@ when true:
   echo "waiter ret  wp=", wp
 
   delWaitingPeriod(wp)
+  echo ""
 
 when true:
   proc nada() =
@@ -314,6 +336,7 @@ when true:
   echo "measureFor: time=", time
   var rs = measureFor(time, nada())
   echo "rs=", rs
+  echo ""
 
 when true:
   if cmdArgs["v"] != nil:
@@ -324,4 +347,5 @@ when true:
     echo "id=", cpuid(v)
   else:
     echo "Need command line <v=n> where n is some integer"
+  echo ""
 
