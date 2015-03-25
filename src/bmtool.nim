@@ -121,6 +121,16 @@ proc rdtscp*(): int64 {.inline.} =
   """.}
   result = int64(lo) or (int64(hi) shl 32)
 
+proc rdtscp*(tscAux: var int): int64 {.inline.} =
+  var lo, hi, aux: uint32
+  {.emit: """
+    asm volatile (
+      "rdtscp\n\t"
+      :"=a"(`lo`), "=d"(`hi`), "=c"(`aux`));
+  """.}
+  tscAux = cast[int](aux)
+  result = int64(lo) or (int64(hi) shl 32)
+
 proc getBegCycles*(): int64 {.inline.} =
   cpuid()
   result = rdtsc()
@@ -129,12 +139,23 @@ proc getEndCycles*(): int64 {.inline.} =
   result = rdtscp()
   cpuid()
 
+proc getEndCycles*(tscAux: var int): int64 {.inline.} =
+  result = rdtscp(tscAux)
+  cpuid()
+
 proc initializeCycles() {.inline.} =
   ## Initalize as per the ia32-ia64-benchmark document
   discard getBegCycles()
   discard getEndCycles()
   discard getBegCycles()
   discard getEndCycles()
+
+proc initializeCycles(tscAux: var int) {.inline.} =
+  ## Initalize as per the ia32-ia64-benchmark document
+  discard getBegCycles()
+  discard getEndCycles()
+  discard getBegCycles()
+  discard getEndCycles(tscAux)
 
 template doBmCycles*(loops: int, body: stmt): RunningStat =
   ## Uses measureCycles to return the RunningStat of executing the procedure parameter.
@@ -308,14 +329,19 @@ proc waiter*(wp: ptr WaitingPeriod) =
 
 template measureFor*(seconds: float, body: stmt): RunningStat =
   ## Meaure the execution time of body in a look timing each loop
-  ## and returning the RunningStat for the loop timings.
+  ## and returning the RunningStat for the loop timings. If
+  ## RunningStat.n = -1 and RunningStat.min == -1 then an error occured.
 
-  const DBG = false
+  const
+    DBG = true
+    DBGV = false
 
   var
     result: RunningStat
     wp: ptr WaitingPeriod
     wt: TThread[ptr WaitingPeriod]
+    tscAuxInitial: int
+    tscAuxNow: int
 
   wp = newWaitingPeriod(seconds)
   # TODO: We should wave a thread pool of waiters as
@@ -323,15 +349,21 @@ template measureFor*(seconds: float, body: stmt): RunningStat =
   # i.e a var and that's not allowed in spawn.
   createThread(wt, waiter, wp)
 
-  initializeCycles()
+  initializeCycles(tscAuxInitial)
+  when DBG: echo "tscAuxInitial=0x", tscAuxInitial.toHex(4)
   while not atomicLoadN(addr wp.done, ATOMIC_ACQUIRE):
     var bc = getBegCycles()
     body
-    var ec = getEndCycles()
+    var ec = getEndCycles(tscAuxNow)
     var duration = float(ec - bc)
-    when DBG: echo "duration=", duration, " ec=", float(ec), " bc=", float(bc)
+    when DBGV: echo "duration=", duration, " ec=", float(ec), " bc=", float(bc)
+    if tscAuxInitial != tscAuxNow:
+      when DBG: echo "bad tscAuxNow=0x", tscAuxNow.toHex(4), " != tscAuxInitial=0x", tscAuxInitial.toHex(4)
+      result.n = -1
+      result.min = -1
+      break
     if duration < 0:
-      when DBG: echo "bad duration=", duration, " ec=", float(ec), " bc=", float(bc)
+      when DBG: echo "ignore duration=", duration, " ec=", float(ec), " bc=", float(bc)
     else:
       result.push(duration)
   delWaitingPeriod(wp)
