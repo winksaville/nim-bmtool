@@ -352,13 +352,20 @@ when true:
       for i in 0..1_000:
         val = atomic_add_fetch(addr val, 1, ATOMIC_RELAXED)
 
-    benchSuite "suite1":
-      var rs: RunningStat
-      var runTime = 0.100
-      var val: int
+    var
+      runTime = 0.100
+      cyclesToRun: int
+      cps = cyclesPerSecond(0.25)
 
-      if cmdArgs["rt"] != nil:
-        runTime = parseFloat(cmdArgs["rt"])
+    if cmdArgs["rt"] != nil:
+      runTime = parseFloat(cmdArgs["rt"])
+    cyclesToRun = round(runTime * cps.toFloat())
+    echo "cps=", cps, " runTime=", runTime, " cyclesToRun=", cyclesToRun
+
+    benchSuite "suite1":
+      var
+        rs: RunningStat
+        val: int
 
       # both setup are injected thus avaiable to subsequent benchSuite
       # Not really what
@@ -367,16 +374,16 @@ when true:
       teardown:
         echo "my teardown"
 
-      bench "nada", 0.5, rs:
+      bench "nada", cyclesToRun, rs:
         nada()
       echo "min=", rs.min, "\n"
 
       val = 0
-      bench "inc ATOMIC_RELAXED", runTime, rs:
+      bench "inc ATOMIC_RELAXED", cyclesToRun, rs:
         val = atomic_add_fetch(addr val, 1, ATOMIC_RELAXED)
       echo "val=", val, " min=", rs.min, "\n"
 
-      bench "inc ATOMIC_SEQ_CST", runTime, rs:
+      bench "inc ATOMIC_SEQ_CST", cyclesToRun, rs:
         discard atomic_add_fetch(addr val, 1, ATOMIC_SEQ_CST)
       echo "min=", rs.min , "\n"
 
@@ -385,7 +392,7 @@ when true:
       setup:
         echo "work setup"
 
-      bench "work", runTime, rs:
+      bench "work", cyclesToRun, rs:
         work()
       echo "min=", rs.min, "\n"
 

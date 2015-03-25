@@ -150,12 +150,13 @@ proc initializeCycles() {.inline.} =
   discard getBegCycles()
   discard getEndCycles()
 
-proc initializeCycles(tscAux: var int) {.inline.} =
-  ## Initalize as per the ia32-ia64-benchmark document
+proc initializeCycles(tscAux: var int): int {.inline.} =
+  ## Initalize as per the ia32-ia64-benchmark document returning
+  ## the tsc value as exiting and the tscAux in the var param
   discard getBegCycles()
   discard getEndCycles()
   discard getBegCycles()
-  discard getEndCycles(tscAux)
+  result = cast[int](getEndCycles(tscAux))
 
 template doBmCycles*(loops: int, body: stmt): RunningStat =
   ## Uses measureCycles to return the RunningStat of executing the procedure parameter.
@@ -327,9 +328,48 @@ proc waiter*(wp: ptr WaitingPeriod) =
   wait(wp.seconds)
   atomicstoreN(addr wp.done, true, ATOMIC_RELEASE)
 
-template measureFor*(seconds: float, body: stmt): RunningStat =
-  ## Meaure the execution time of body in a look timing each loop
-  ## and returning the RunningStat for the loop timings. If
+proc cps(seconds: float): int =
+  ## Try to determine the cycles per second of the TSC
+  ## seconds is how long to meausre. return -1 if unsuccessful
+  ## or its the number of cycles per second
+  const
+    DBG = true
+
+  var
+    wp: ptr WaitingPeriod
+    wt: TThread[ptr WaitingPeriod]
+    tscAuxInitial: int
+    tscAuxNow: int
+    start : int
+    ec : int
+
+  try:
+    wp = newWaitingPeriod(seconds)
+    createThread(wt, waiter, wp)
+    start = initializeCycles(tscAuxInitial)
+    when DBG: echo "tscAuxInitial=0x", tscAuxInitial.toHex(4)
+    while not atomicLoadN(addr wp.done, ATOMIC_ACQUIRE):
+      ec = cast[int](getEndCycles(tscAuxNow))
+      if tscAuxInitial != tscAuxNow:
+        when DBG: echo "bad tscAuxNow=0x", tscAuxNow.toHex(4), " != tscAuxInitial=0x", tscAuxInitial.toHex(4)
+        return -1
+    result = round((ec - start).toFloat() / seconds)
+  finally:
+    # Wait until the time has expired so we can delete the waiting period
+    while not atomicLoadN(addr wp.done, ATOMIC_ACQUIRE):
+      sleep(10)
+    delWaitingPeriod(wp)
+
+proc cyclesPerSecond*(seconds: float): int =
+  for i in 0..2:
+    result = cps(seconds)
+    if result != -1:
+      return result
+  result = -1
+
+template measureFor*(cycles: int, body: stmt): RunningStat =
+  ## Meaure the execution time of body for cycles count of TSC
+  ## returning the RunningStat for the loop timings. If
   ## RunningStat.n = -1 and RunningStat.min == -1 then an error occured.
 
   const
@@ -338,23 +378,22 @@ template measureFor*(seconds: float, body: stmt): RunningStat =
 
   var
     result: RunningStat
-    wp: ptr WaitingPeriod
-    wt: TThread[ptr WaitingPeriod]
     tscAuxInitial: int
     tscAuxNow: int
+    start: int
+    done: int
+    bc : int64
+    ec : int64
 
-  wp = newWaitingPeriod(seconds)
-  # TODO: We should wave a thread pool of waiters as
-  # we can't use spawn because we are passing a ptr
-  # i.e a var and that's not allowed in spawn.
-  createThread(wt, waiter, wp)
-
-  initializeCycles(tscAuxInitial)
+  # TODO: Handle wrapping of counter!
+  start = initializeCycles(tscAuxInitial)
+  done = start + cycles
   when DBG: echo "tscAuxInitial=0x", tscAuxInitial.toHex(4)
-  while not atomicLoadN(addr wp.done, ATOMIC_ACQUIRE):
-    var bc = getBegCycles()
+  ec = 0
+  while ec <= done:
+    bc = getBegCycles()
     body
-    var ec = getEndCycles(tscAuxNow)
+    ec = getEndCycles()
     var duration = float(ec - bc)
     when DBGV: echo "duration=", duration, " ec=", float(ec), " bc=", float(bc)
     if tscAuxInitial != tscAuxNow:
@@ -362,11 +401,10 @@ template measureFor*(seconds: float, body: stmt): RunningStat =
       result.n = -1
       result.min = -1
       break
-    if duration < 0:
+    if duration < 0.0:
       when DBG: echo "ignore duration=", duration, " ec=", float(ec), " bc=", float(bc)
     else:
       result.push(duration)
-  delWaitingPeriod(wp)
   result
 
 when true:
@@ -394,10 +432,10 @@ when true:
   # with each bench invocation. Pragma .immediate. is not needed because there is nothing to inject for benchBody?
   #
   # TODO: How to make benchName available to the bench and benchSuite?
-  template bench*(benchName: expr, runTime: float, runningStat: var RunningStat, benchBody: stmt): stmt {.immediate, dirty.} =
+  template bench*(benchName: expr, cycles: int, runningStat: var RunningStat, benchBody: stmt): stmt {.immediate, dirty.} =
     echo "bench name=", benchName
     benchSetupImpl()
 
-    runningStat = measureFor(runTime, benchBody)
+    runningStat = measureFor(cycles, benchBody)
 
     benchTeardownImpl()
